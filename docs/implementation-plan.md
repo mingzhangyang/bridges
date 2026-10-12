@@ -5,7 +5,7 @@
 
 本文件是 `mingzhangyang/bridges` 的详细实现方案与持续维护规格。代码、关卡、素材、测试和发布均在本独立仓库中完成；games 仅在正式发布后提供外链目录入口。
 
-共同方向、外链接入、交付批次、文档迁移与数学来源见 [两款图论游戏交付方案](proposal-graph-puzzles-delivery.md)。
+共同方向、外链接入、交付批次和数学来源见 [两款图论游戏交付方案](proposal-graph-puzzles-delivery.md)。详细方案的独立仓库副本见 [bridges/docs/implementation-plan.md](https://github.com/mingzhangyang/bridges/blob/main/docs/implementation-plan.md)。
 
 ## 1 产品定位与第一分钟
 
@@ -143,9 +143,9 @@ bridges/                       独立仓库根目录
     input/{pointer,bridge-hit-test,keyboard}.js
     services/{settings,daily,hints,replay,export}.js
     storage.js / i18n.js / audio.js
-  tools/generators/seven-bridges-build.mjs
-  tests/verify-seven-bridges-{rules,levels,repair,daily}.mjs
-  tests/smoke-seven-bridges.mjs
+  tools/generators/bridges-build.mjs
+  tests/verify-bridges-{rules,levels,repair,daily}.mjs
+  tests/smoke-bridges.mjs
 ```
 
 **模型：**`nodes[{id}], edges[{id,u,v}], requiredNodes, protectedEdges, candidateEdits, objective, fixedStart, fixedEnd`；坐标、桥廊、桥头、建筑和移动端布局属于 geometry/art，不进入规则判断。首发支持平行边，不开放自环；装饰步道不算边。图视图中曲线交叉也不自动成为节点。
