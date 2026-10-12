@@ -98,4 +98,9 @@ test('discovery phase and blueprint undo history survive restoration', () => {
   const works = getLevel('SB32'),
     planning = { ...newRun(works), draftEdits: ['BC1'], editHistory: [[]] };
   assert.deepEqual(restoreRun(works, planning).editHistory, [[]]);
+  const guarded = getLevel('SB31');
+  assert.deepEqual(
+    restoreRun(guarded, { ...newRun(guarded), editHistory: [['remove-b4']] }).editHistory,
+    [],
+  );
 });

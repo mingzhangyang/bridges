@@ -58,11 +58,12 @@ export function startGame() {
     nm = (p) => name(settings.lang, p);
   const dailyMode = () => key?.startsWith('daily:');
   const motion = motionController((next) => {
-    $('stage').classList.remove('morphing');
     if (next && !document.hidden) submit(next);
   });
   const frozenKey = (entry, type) => dailyKey(entry, type);
   const resolveKey = resolveSaveKey;
+  const objectiveText = () =>
+    tr(level.kind === 'discovery' ? 'discover' : level.fixedEnd ? 'fixed' : level.objective);
   function save() {
     snapshot = { ...snapshot, settings, runs: { ...snapshot.runs, [key]: run }, lastLevel: key };
     const success = store.trySet(snapshot);
@@ -178,7 +179,7 @@ export function startGame() {
     $('view-label').textContent = view === 'city' ? 'CITY ATLAS' : 'RELATION GRAPH';
     $('level-number').textContent = daily ? daily.date : level.id;
     $('mobile-level-title').textContent = `${level.id} · ${nm(level.title)}`;
-    $('stage-note').textContent = level.objective === 'return' ? tr('return') : tr('open');
+    $('stage-note').textContent = objectiveText();
     $('mode-label').textContent =
       level.kind === 'repair'
         ? tr('planning')
@@ -188,13 +189,8 @@ export function startGame() {
             ? tr('daily')
             : `${String(level.chapter).padStart(2, '0')} / 04`;
     $('level-title').textContent = nm(level.title);
-    $('objective').textContent = level.kind === 'discovery' ? tr('discover') : tr(level.objective);
-    let g = graph();
-    if (run.phase === 'planning') {
-      try {
-        g = applyEdits(level, run.draftEdits).graph;
-      } catch {}
-    }
+    $('objective').textContent = objectiveText();
+    const g = graph();
     $('progress-number').textContent = `${run.walkedEdgeIds.length} / ${g.edges.length}`;
     $('progress-label').textContent = tr('walked');
     $('progress-dots').innerHTML = g.edges
@@ -413,7 +409,12 @@ export function startGame() {
         openAtlas();
         return;
       }
-      const next = levels[levels.findIndex((l) => l.id === level.id) + 1];
+      const index = levels.findIndex((l) => l.id === level.id);
+      if (index < 0) {
+        openAtlas('works');
+        return;
+      }
+      const next = levels[index + 1];
       if (next && chapterUnlocked(next.chapter)) select(next);
       else openAtlas();
     };
@@ -524,7 +525,6 @@ export function startGame() {
   $('undo-button').onclick = () => {
     motion.cancel();
     cancelPointer();
-    $('stage').classList.remove('morphing');
     if (run.phase === 'planning') {
       if (run.editHistory.length)
         run = {
@@ -542,7 +542,6 @@ export function startGame() {
   $('restart-button').onclick = () => {
     motion.cancel();
     cancelPointer();
-    $('stage').classList.remove('morphing');
     const fresh = newRun(level, dailyMode() ? run.assistance || !!snapshot.assistance[key] : false);
     if (level.kind === 'repair' && run.phase !== 'planning') {
       fresh.phase = 'walking';
@@ -575,7 +574,6 @@ export function startGame() {
     }
     motion.cancel();
     cancelPointer();
-    $('stage').classList.remove('morphing');
     if (!run.currentNode) {
       markAssistance();
       counts = true;
@@ -598,7 +596,6 @@ export function startGame() {
   function openSettings() {
     motion.cancel();
     cancelPointer();
-    $('stage').classList.remove('morphing');
     showDialog(
       tr('settings'),
       `<label class="settings-row">${tr('language')}<select id="lang-select"><option value="zh" ${settings.lang === 'zh' ? 'selected' : ''}>简体中文</option><option value="en" ${settings.lang === 'en' ? 'selected' : ''}>English</option></select></label><label class="settings-row">${tr('theme')}<select id="theme-select"><option value="light" ${settings.theme === 'light' ? 'selected' : ''}>${tr('light')}</option><option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>${tr('dark')}</option></select></label><div class="settings-row"><span>${tr('sound')}</span><button data-action="sound">${tr(settings.muted ? 'muted' : 'on')}</button></div>`,
@@ -639,7 +636,6 @@ export function startGame() {
   function openAtlas(tab = 'main') {
     motion.cancel();
     cancelPointer();
-    $('stage').classList.remove('morphing');
     save();
     const tabs = `<div class="dialog-tabs">${[
       ['main', 'map'],
@@ -836,7 +832,6 @@ export function startGame() {
   document.addEventListener('visibilitychange', () => {
     motion.cancel();
     cancelPointer();
-    $('stage').classList.remove('morphing');
     if (document.hidden) {
       dialogCleanup?.();
       sound.suspend();
@@ -851,7 +846,6 @@ export function startGame() {
   matchMedia('(max-width:700px)').addEventListener('change', () => {
     motion.cancel();
     cancelPointer();
-    $('stage').classList.remove('morphing');
     renderScene();
   });
   window.addEventListener('hashchange', navigateHash);

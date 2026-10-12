@@ -31,7 +31,7 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-`check` 包含统一格式、JavaScript 语法、独立运行边界、66 项数学 / 内容 / 持久化测试和静态构建。浏览器检查会通过真实 UI 走完所有可行关，单独完成历史发现，并覆盖回放、输入、存档、日界线、动画取消、320px 布局与 CPU 限速下的模型耗时。截图与测量保存在 `test-results/`，CI 上传为验收附件。
+`check` 包含统一格式、JavaScript 语法、独立运行边界、70 项数学 / 内容 / 持久化测试和静态构建。浏览器检查会通过真实 UI 走完所有可行关，单独完成历史发现，并覆盖回放、输入、存档、日界线、动画取消、320px 布局与 CPU 限速下的模型耗时。截图与测量保存在 `test-results/`，CI 上传为验收附件。
 
 `npm run build` 生成 `dist/` 和完整关卡见证 `content-proof.json`。更新每日清单时执行 `node tools/generators/daily-build.mjs`，审阅排期，运行格式化与全部验收，再发布；构建不会根据当前日期偷偷改题。
 

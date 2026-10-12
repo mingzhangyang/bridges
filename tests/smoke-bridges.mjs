@@ -255,6 +255,44 @@ try {
       assert.equal(saved.runs['daily:2026-10-12:1:walk'].assistance, true);
     },
   );
+  await scenario(
+    'Disconnected engineering drafts stay in planning; commission completion returns to works',
+    async () => {
+      await p.goto(`${base}/?lang=en#EC07`);
+      if (!(await p.locator('#confirm-blueprint').count())) {
+        await p.locator('#edit-blueprint').click();
+        await p.locator('[data-action="edit"]').click();
+      }
+      for (const edit of getLevel('EC07').candidateEdits) {
+        const button = p.locator(`[data-edit="${edit.id}"]`);
+        if ((await button.getAttribute('aria-pressed')) === 'true') await button.click();
+      }
+      await p.locator('#confirm-blueprint').click();
+      assert.equal(await p.locator('#confirm-blueprint').isVisible(), true);
+      await p.locator('[data-edit="CD"]').click();
+      await p.locator('#confirm-blueprint').click();
+      await p.locator('[data-node="C"]').focus();
+      await p.keyboard.press('Enter');
+      const proof = repairSolution(getLevel('EC07'));
+      for (const id of proof.route.edges) await keyBridge(p, id);
+      assert.equal(await p.locator('#complete-banner').isVisible(), true);
+      await p.locator('#next-level').click();
+      assert.match(await p.locator('[data-action="tab:works"]').getAttribute('class'), /primary/);
+      assert.ok(p.url().endsWith('#EC07'));
+      await p.locator('#dialog-close').click();
+    },
+  );
+  await scenario(
+    'Required endpoints have consistent objective copy in both map and journal',
+    async () => {
+      await p.goto(`${base}/?lang=en#SB23`);
+      for (const id of ['objective', 'stage-note']) {
+        const text = await p.locator(`#${id}`).textContent();
+        assert.match(text, /required endpoints/);
+        assert.doesNotMatch(text, /finish anywhere/);
+      }
+    },
+  );
   await unlocked.context.close();
   const mobile = await pageFor({ mobile: true });
   await mobile.page.goto(`${base}/?lang=zh`);
@@ -361,6 +399,17 @@ try {
       assert.equal(await motionPage.evaluate(() => window.rafRequests), idle);
     },
   );
+  await scenario(
+    'Selecting a different level during a morph cannot retain the input lock',
+    async () => {
+      await motionPage.locator('#lens-button').click();
+      await motionPage.evaluate(() => (location.hash = 'SB02'));
+      await motionPage.waitForTimeout(50);
+      assert.equal(await motionPage.locator('.morphing').count(), 0);
+      await keyBridge(motionPage, 'b2');
+      assert.equal(await motionPage.locator('#progress-number').textContent(), '1 / 7');
+    },
+  );
   await motionCase.context.close();
   const performanceCase = await pageFor({ unlocked: true });
   const perfPage = performanceCase.page;
@@ -425,6 +474,17 @@ try {
     },
   );
   await performanceCase.context.close();
+  const invalidSave = await pageFor();
+  await invalidSave.page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+    key: STORAGE_KEY,
+    value: JSON.stringify({ ...emptySnapshot(), lastLevel: 1 }),
+  });
+  await invalidSave.page.goto(base);
+  await scenario('Malformed lastLevel cannot prevent startup', async () => {
+    assert.equal(await invalidSave.page.locator('#level-number').textContent(), 'SB01');
+    assert.equal(await invalidSave.page.locator('#progress-number').textContent(), '0 / 3');
+  });
+  await invalidSave.context.close();
   assert.deepEqual(errors, []);
   await writeFile(
     'test-results/browser-summary.json',

@@ -6,10 +6,13 @@ export function motionController(
     timer = 0,
     token = 0,
     moving = false,
-    buffer = null;
+    buffer = null,
+    morphStage = null;
   const finish = () => {
     cancelAnimationFrame(frame);
     clearTimeout(timer);
+    morphStage?.classList.remove('morphing');
+    morphStage = null;
     moving = false;
   };
   return {
@@ -26,6 +29,7 @@ export function motionController(
     },
     morph(stage, view) {
       this.cancel();
+      morphStage = stage;
       stage.classList.add('morphing');
       moving = true;
       const mine = ++token;
@@ -33,7 +37,6 @@ export function motionController(
         () => {
           if (mine !== token) return;
           finish();
-          stage.classList.remove('morphing');
           onEnd(null);
         },
         reduced() ? 0 : 460,

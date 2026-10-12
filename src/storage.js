@@ -30,7 +30,11 @@ export function storageAdapter(getStorage = () => globalThis.localStorage) {
           )
         )
           throw new Error('Invalid save');
-        return { ...emptySnapshot(), ...value };
+        return {
+          ...emptySnapshot(),
+          ...value,
+          lastLevel: typeof value.lastLevel === 'string' ? value.lastLevel : 'SB01',
+        };
       } catch {
         error = true;
         return emptySnapshot();

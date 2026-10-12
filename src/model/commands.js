@@ -1,5 +1,5 @@
 import { otherEnd } from './graph.js';
-import { applyEdits } from './repair.js';
+import { applyEdits, previewBlueprint } from './repair.js';
 import { routeComplete, availableEdges, discoveryComplete } from './rules.js';
 import { replay } from '../services/replay.js';
 export function newRun(level, assistance = false) {
@@ -21,7 +21,10 @@ export function newRun(level, assistance = false) {
   };
 }
 export function graphFor(level, run) {
-  return level.kind === 'repair' ? applyEdits(level, run.finalEditSet).graph : level;
+  if (level.kind !== 'repair') return level;
+  return run.phase === 'planning'
+    ? previewBlueprint(level, run.draftEdits).graph
+    : applyEdits(level, run.finalEditSet).graph;
 }
 export function chooseStart(level, run, node) {
   if (
@@ -124,14 +127,14 @@ export function restoreRun(level, saved) {
     // The previous draft must remain available after reloading the planning phase.
     base.editHistory = Array.isArray(saved.editHistory)
       ? saved.editHistory
-          .filter(
-            (ids) =>
-              Array.isArray(ids) &&
-              new Set(ids).size === ids.length &&
-              ids.every((id) => candidates.some((e) => e.id === id)) &&
-              ids.reduce((sum, id) => sum + (candidates.find((e) => e.id === id).cost ?? 1), 0) <=
-                (level.budget ?? 0),
-          )
+          .filter((ids) => {
+            try {
+              previewBlueprint(level, ids);
+              return true;
+            } catch {
+              return false;
+            }
+          })
           .slice(-100)
       : [];
     base.discoveryNodes = (saved.discoveryNodes ?? []).filter((n) =>

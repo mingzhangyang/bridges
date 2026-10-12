@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { allLevels, getLevel } from '../src/content/levels.js';
-import { applyEdits, repairSolution } from '../src/model/repair.js';
+import { applyEdits, repairSolution, previewBlueprint } from '../src/model/repair.js';
 import { replay } from '../src/services/replay.js';
 // Independent DFS route existence, without Euler degree criteria or Hierholzer.
 function canWalk(g, start, end) {
@@ -28,7 +28,12 @@ for (const l of allLevels.filter((l) => l.kind === 'repair'))
     for (let m = 0; m < 2 ** l.candidateEdits.length; m++) {
       const ids = l.candidateEdits.filter((_, i) => m & (1 << i)).map((e) => e.id);
       try {
-        const { graph, cost } = applyEdits(l, ids);
+        const { graph, cost } = previewBlueprint(l, ids);
+        if (
+          !graph.edges.length ||
+          (l.requiredNodes ?? []).some((n) => !graph.edges.some((e) => e.u === n || e.v === n))
+        )
+          continue;
         if (cost >= minimum) continue;
         for (const n of graph.nodes) {
           if (l.fixedStart && n.id !== l.fixedStart) continue;
@@ -97,4 +102,15 @@ test('remove/add cancellation cannot manufacture an edit or reward', () => {
     ],
   };
   assert.throws(() => applyEdits(l, ['remove', 'add']));
+});
+
+test('draft disconnected cycles are visible but cannot be confirmed', () => {
+  const l = getLevel('SB27');
+  assert.equal(previewBlueprint(l, []).graph.edges.length, 6);
+  assert.throws(() => applyEdits(l, []), /Disconnected/);
+});
+test('final blueprints must satisfy fixed endpoints and return parity', () => {
+  assert.throws(() => applyEdits(getLevel('SB25'), []), /Unwalkable/);
+  assert.throws(() => applyEdits(getLevel('SB25'), ['AD2']), /Unwalkable/);
+  assert.throws(() => applyEdits(getLevel('SB32'), ['BC1']), /Unwalkable/);
 });

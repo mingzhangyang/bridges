@@ -1,7 +1,7 @@
-import { validateGraph, degrees } from './graph.js';
-import { eulerRoute } from './euler.js';
+import { validateGraph, degrees, components } from './graph.js';
+import { eulerRoute, feasibility } from './euler.js';
 import { replay } from '../services/replay.js';
-export function applyEdits(level, ids) {
+export function previewBlueprint(level, ids) {
   if (!Array.isArray(ids) || new Set(ids).size !== ids.length) throw new Error('Duplicate edits');
   const candidates = level.candidateEdits ?? [];
   if (new Set(candidates.map((e) => e.id)).size !== candidates.length)
@@ -33,8 +33,20 @@ export function applyEdits(level, ids) {
   }
   if (cost > (level.budget ?? 0)) throw new Error('Over budget');
   const graph = validateGraph({ ...level, edges });
-  if (!edges.length || (level.requiredNodes ?? []).some((n) => !degrees(graph)[n]))
+  return { graph, cost };
+}
+export function applyEdits(level, ids) {
+  const { graph, cost } = previewBlueprint(level, ids);
+  if (!graph.edges.length || (level.requiredNodes ?? []).some((n) => !degrees(graph)[n]))
     throw new Error('Unserved area');
+  if (components(graph).length !== 1) throw new Error('Disconnected service areas');
+  const possible = feasibility(
+    graph,
+    level.fixedStart,
+    level.objective === 'return' ? level.fixedStart : level.fixedEnd,
+  );
+  if (!possible.ok || (level.objective === 'return' && possible.start !== possible.end))
+    throw new Error('Unwalkable objective');
   return { graph, cost };
 }
 export function repairSolution(level) {

@@ -106,3 +106,9 @@ test('future-version snapshots are preserved rather than silently overwritten', 
   assert.equal(storage.trySet(emptySnapshot()), false);
   assert.equal(raw, original);
 });
+
+test('invalid lastLevel recovers the navigation field without discarding valid records', () => {
+  const saved = { ...emptySnapshot(), lastLevel: 1 };
+  const adapter = storageAdapter(() => ({ getItem: () => JSON.stringify(saved) }));
+  assert.equal(adapter.read().lastLevel, 'SB01');
+});
