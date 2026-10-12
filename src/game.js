@@ -456,7 +456,7 @@ export function startGame() {
     if (run.phase === 'complete' && document.activeElement?.closest('[data-bridge]'))
       $('next-level')?.focus({ preventScroll: true });
     const edge = g.edges.find((e) => e.id === id);
-    if (!settings.muted) sound.step(edge.material);
+    if (!settings.muted) void sound.step(edge.material, () => !settings.muted && !document.hidden);
     motion.walk(
       $('stage').querySelector('.traveler'),
       geo.curves[id],

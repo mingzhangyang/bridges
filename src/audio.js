@@ -12,8 +12,13 @@ export function audioService() {
         return false;
       }
     },
-    step(material = 'wood') {
-      if (context?.state !== 'running') return;
+    async step(material = 'wood', active = () => true) {
+      // A saved unmuted preference still needs a fresh user gesture after reload or backgrounding.
+      if (!(await this.enable())) return false;
+      if (!active()) {
+        this.suspend();
+        return false;
+      }
       const o = context.createOscillator(),
         g = context.createGain();
       o.type = 'sine';
@@ -23,6 +28,7 @@ export function audioService() {
       o.connect(g).connect(context.destination);
       o.start();
       o.stop(context.currentTime + 0.15);
+      return true;
     },
     suspend() {
       context?.suspend().catch(() => {});
