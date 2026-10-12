@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f1e7" />
+    <meta
+      name="description"
+      content="七桥漫游：在纸雕水城中走遍每座桥，发现七桥问题，再亲手修桥创造新的归途。32 个主线关、工程委托与每日漫游。"
+    />
+    <title>七桥漫游 · Seven Bridges</title>
+    <link rel="canonical" href="https://bridges.orangely.xyz/" />
+    <meta property="og:title" content="七桥漫游 · Seven Bridges" />
+    <meta property="og:description" content="每座桥，一次。读懂一座城，也为它造一条新路。" />
+    <meta property="og:image" content="https://bridges.orangely.xyz/og.png" />
+    <meta property="og:url" content="https://bridges.orangely.xyz/" />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <script type="module" src="/src/index.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="masthead">
+        <a class="brand" href="#SB01"
+          ><span class="brand-mark" aria-hidden="true">⌒</span><span id="brand-title">七桥漫游</span
+          ><span class="brand-en">SEVEN BRIDGES</span></a
+        >
+        <nav aria-label="Main">
+          <button id="map-button"></button><button id="help-button"></button
+          ><button id="settings-button" class="icon-button" aria-label="设置">☷</button>
+        </nav>
+      </header>
+      <main>
+        <div class="intro">
+          <div>
+            <p class="eyebrow">A CITY, ONE JOURNEY</p>
+            <h1 id="tagline">每座桥，一次。</h1>
+            <p id="subtitle">读懂一座城，也为它造一条新路。</p>
+          </div>
+          <button class="daily-link" id="daily-button">
+            <span aria-hidden="true">◷</span><span id="daily-label"></span
+            ><small id="daily-date"></small>
+          </button>
+        </div>
+        <section class="journey-layout">
+          <div class="map-panel">
+            <div class="map-topline">
+              <span id="chapter-label"></span><span id="mobile-level-title"></span
+              ><span id="view-label">CITY ATLAS</span>
+            </div>
+            <div id="stage" class="stage"></div>
+            <div class="map-bottomline">
+              <span id="level-number"></span><span id="stage-note"></span
+              ><span class="compass" aria-hidden="true">N ↑</span>
+            </div>
+            <div id="complete-banner" hidden></div>
+          </div>
+          <aside class="journal">
+            <p id="mode-label" class="eyebrow"></p>
+            <h2 id="level-title"></h2>
+            <p id="objective" class="objective"></p>
+            <div class="progress">
+              <div>
+                <strong id="progress-number">0 / 3</strong><span id="progress-label"></span>
+              </div>
+              <div id="progress-dots" class="progress-dots"></div>
+            </div>
+            <div class="endpoints"><span id="start-fact"></span><span id="end-fact"></span></div>
+            <section class="route-journal">
+              <h3 id="route-title"></h3>
+              <div id="route-history"></div>
+            </section>
+            <div id="engineering" hidden></div>
+            <div id="discovery" hidden></div>
+            <p id="message" class="message" role="status" aria-live="polite"></p>
+            <div id="hint-detail"></div>
+            <div id="journal-actions"></div>
+          </aside>
+        </section>
+        <div class="toolbar" aria-label="Journey controls">
+          <button id="undo-button"><span aria-hidden="true">↶</span><span></span></button
+          ><button id="lens-button"><span aria-hidden="true">◎</span><span></span></button
+          ><button id="hint-button"><span aria-hidden="true">✧</span><span></span></button
+          ><span class="toolbar-spacer"></span
+          ><button id="restart-button"><span aria-hidden="true">↺</span><span></span></button>
+        </div>
+        <div id="save-warning" class="save-warning" hidden role="alert">
+          <span></span><button id="retry-save"></button>
+        </div>
+      </main>
+      <footer>
+        <a id="collection-link" href="https://games.orangely.xyz/"></a
+        ><span>EST. 1736 <i>·</i> MADE FOR WANDERING</span><span id="saved-state"></span>
+      </footer>
+    </div>
+    <dialog id="dialog">
+      <div class="dialog-head">
+        <h2 id="dialog-title"></h2>
+        <button id="dialog-close" class="icon-button">×</button>
+      </div>
+      <div id="dialog-content"></div>
+    </dialog>
+    <noscript>七桥漫游需要启用 JavaScript。Seven Bridges requires JavaScript.</noscript>
+  </body>
+</html>
