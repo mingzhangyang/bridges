@@ -160,7 +160,7 @@ bridges/                       独立仓库根目录
 
 ## 11 状态 存档与跨视图一致性
 
-页面状态包括 `chapter-map, planning, walking, stuck, discovery, complete`；`city/graph` 是独立展示状态。记录 `levelRevision, finalEditSet, startNode, currentNode, walkedEdgeIds, history, assistance`。visitedEdges 与当前位置必须能由起点和路径重建，读档时校验重建结果；不能同时相信两份互相矛盾的状态。
+页面状态包括 `chapter-map, planning, walking, stuck, discovery, complete`；`city/graph` 是独立展示状态。记录 `levelRevision, finalEditSet, startNode, currentNode, walkedEdgeIds, history, assistance`。`walkedEdgeIds` 与当前位置必须能由起点和路径重建，读档时校验重建结果；不能同时相信两份互相矛盾的状态。
 
 一次行走提交一个命令；一次工程确认提交一份完整最终编辑集合。游戏在后台暂停声景、计时和动画；回前台直接从模型恢复信使位置，不补跑隐藏期间的脚步。开帮助不消耗路线资源。完成事件有 runId 防重入，重复回放不重复解锁或盖章。
 
