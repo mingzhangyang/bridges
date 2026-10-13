@@ -15,6 +15,7 @@ import { bridgeLabel, nodeLabel } from '../src/render/labels.js';
 import { citySVG } from '../src/render/city.js';
 import { geometry } from '../src/render/geometry.js';
 import { motionController } from '../src/render/motion.js';
+import { nextBridge } from '../src/input/keyboard.js';
 
 // Walk every playable level along its proven route. At every step, a bridge is offered as
 // walkable exactly when move() accepts it, and islands are offered exactly when chooseStart
@@ -145,4 +146,15 @@ test('cancelling a walk places the messenger at the committed destination', () =
     globalThis.requestAnimationFrame = raf;
     globalThis.cancelAnimationFrame = caf;
   }
+});
+
+test('arrow navigation starts from either end when focus is off the actionable list', () => {
+  const ids = ['x', 'y', 'z'];
+  assert.equal(nextBridge(ids, 'used', true), 'z');
+  assert.equal(nextBridge(ids, 'used', false), 'x');
+  assert.equal(nextBridge(ids, undefined, true), 'z');
+  assert.equal(nextBridge(ids, 'x', true), 'z');
+  assert.equal(nextBridge(ids, 'z', false), 'x');
+  assert.equal(nextBridge(ids, 'y', true), 'x');
+  assert.equal(nextBridge([], 'x', true), null);
 });

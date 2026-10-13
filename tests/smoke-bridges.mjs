@@ -304,8 +304,15 @@ try {
     await p.screenshot({ path: 'test-results/night-blueprint.png', fullPage: true });
     await p.locator('#confirm-blueprint').click();
     assert.equal(await p.locator('#progress-number').textContent(), '0 / 9');
-    for (const id of ['AB1', 'AB2', 'AC1', 'BC1', 'BD', 'CD', 'AC2', 'AD', 'AD2'])
-      await keyBridge(p, id);
+    // Focus rests on the crossed bridge; arrows must still reach every choice from B.
+    await keyBridge(p, 'AB1');
+    const focusedBridge = () =>
+      p.evaluate(() => document.activeElement?.closest('[data-bridge]')?.dataset.bridge);
+    await p.keyboard.press('ArrowLeft');
+    assert.equal(await focusedBridge(), 'BC1');
+    await p.keyboard.press('ArrowRight');
+    assert.equal(await focusedBridge(), 'AB2');
+    for (const id of ['AB2', 'AC1', 'BC1', 'BD', 'CD', 'AC2', 'AD', 'AD2']) await keyBridge(p, id);
     assert.equal(await p.locator('#complete-banner').isVisible(), true);
     assert.match(await p.locator('#complete-banner').textContent(), /Minimal works seal/);
     await p.screenshot({ path: 'test-results/nine-bridges-complete.png', fullPage: true });
