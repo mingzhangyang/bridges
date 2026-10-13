@@ -7,12 +7,15 @@ export function motionController(
     token = 0,
     moving = false,
     buffer = null,
-    morphStage = null;
+    morphStage = null,
+    walking = null;
+  const place = (element, p) => element?.setAttribute('transform', `translate(${p.x},${p.y})`);
   const finish = () => {
     cancelAnimationFrame(frame);
     clearTimeout(timer);
     morphStage?.classList.remove('morphing');
     morphStage = null;
+    walking = null;
     moving = false;
   };
   return {
@@ -25,6 +28,8 @@ export function motionController(
     cancel() {
       token++;
       buffer = null;
+      // The move is already committed; never leave the messenger drawn mid-bridge.
+      if (walking) place(walking.element, walking.to);
       finish();
     },
     morph(stage, view) {
@@ -46,11 +51,12 @@ export function motionController(
     walk(element, curve, from, to) {
       this.cancel();
       if (reduced()) {
-        element?.setAttribute('transform', `translate(${to.x},${to.y})`);
+        place(element, to);
         onEnd(null);
         return;
       }
       moving = true;
+      walking = { element, to };
       const mine = ++token,
         start = performance.now(),
         reverse = Math.hypot(from.x - curve.b.x, from.y - curve.b.y) < 1;
@@ -58,7 +64,7 @@ export function motionController(
         if (mine !== token) return;
         const t = Math.min(1, (now - start) / 330),
           p = curve.point(reverse ? 1 - t : t);
-        element?.setAttribute('transform', `translate(${p.x},${p.y})`);
+        place(element, p);
         if (t < 1) frame = requestAnimationFrame(tick);
         else {
           const next = buffer;

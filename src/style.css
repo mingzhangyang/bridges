@@ -223,7 +223,7 @@ h1 {
     fill 0.45s,
     stroke-width 0.45s;
 }
-.bridge {
+.bridge.actionable {
   cursor: pointer;
 }
 .bridge-shadow {
@@ -257,7 +257,7 @@ h1 {
   stroke-width: 40;
   pointer-events: stroke;
 }
-.bridge:hover .bridge-rail,
+.bridge.actionable:hover .bridge-rail,
 .bridge:focus .bridge-rail {
   stroke: #4d8479;
   stroke-width: 24;
@@ -282,7 +282,7 @@ h1 {
 .bridge.removed {
   opacity: 0.2;
 }
-.node {
+.node.actionable {
   cursor: pointer;
 }
 .node-dot {

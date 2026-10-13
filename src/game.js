@@ -10,7 +10,14 @@ import {
   restoreRun,
 } from './model/commands.js';
 import { applyEdits, repairSolution } from './model/repair.js';
-import { availableEdges } from './model/rules.js';
+import {
+  actionableBridges,
+  bridgeAction,
+  candidateFor,
+  isProtected,
+  nodeAction,
+  visibleEdges,
+} from './model/interaction.js';
 import { degrees } from './model/graph.js';
 import { storageAdapter, recordCompletion } from './storage.js';
 import {
@@ -27,6 +34,7 @@ import { hint } from './services/hints.js';
 import { postcardBlob, downloadBlob } from './services/export.js';
 import { geometry } from './render/geometry.js';
 import { citySVG } from './render/city.js';
+import { bridgeLabel, bridgeName } from './render/labels.js';
 import { motionController } from './render/motion.js';
 import { attachPointer } from './input/pointer.js';
 import { attachKeyboard } from './input/keyboard.js';
@@ -153,7 +161,6 @@ export function startGame() {
       view,
       counts,
       hintIds: highlight,
-      planning: run.phase === 'planning',
     });
     if (focused?.bridge)
       $('stage').querySelector(`[data-bridge="${focused.bridge}"]`)?.focus({ preventScroll: true });
@@ -222,13 +229,15 @@ export function startGame() {
       run.phase === 'planning' ? 'planUndo' : 'undo',
     );
     $('undo-button').disabled =
-      run.phase === 'planning' ? !run.editHistory.length : !run.walkedEdgeIds.length;
+      run.phase === 'planning'
+        ? !run.editHistory.length
+        : run.phase === 'discovery' || !run.walkedEdgeIds.length;
     $('lens-button').querySelector('span:last-child').textContent = tr(
       view === 'city' ? 'lens' : 'city',
     );
     $('lens-button').setAttribute('aria-pressed', String(view === 'graph'));
     $('hint-button').querySelector('span:last-child').textContent = tr('hint');
-    $('hint-button').disabled = ['planning', 'complete'].includes(run.phase);
+    $('hint-button').disabled = ['planning', 'complete', 'discovery'].includes(run.phase);
     $('restart-button').querySelector('span:last-child').textContent = tr('restart');
     renderEngineering();
     renderDiscovery();
@@ -256,7 +265,7 @@ export function startGame() {
         .filter((edit) => edit.kind !== 'remove' || !level.protectedEdges.includes(edit.edgeId))
         .map(
           (edit) =>
-            `<button data-edit="${edit.id}" aria-pressed="${run.draftEdits.includes(edit.id)}"><span>${tr(edit.kind)} ${escape(edit.kind === 'add' ? `${edit.edge.u} ↔ ${edit.edge.v} · ${edit.id}` : edit.edgeId)}</span><span>${run.draftEdits.includes(edit.id) ? '✓' : '+'}</span></button>`,
+            `<button data-edit="${edit.id}" aria-pressed="${run.draftEdits.includes(edit.id)}"><span>${tr(edit.kind)} · ${escape(bridgeName(level, edit.kind === 'add' ? edit.edge : level.edges.find((e) => e.id === edit.edgeId), settings.lang))}</span><span>${run.draftEdits.includes(edit.id) ? '✓' : '+'}</span></button>`,
         )
         .join('')}</div><button id="confirm-blueprint" class="primary">${tr('confirm')}</button>`;
       host
@@ -325,7 +334,7 @@ export function startGame() {
       host.innerHTML = '';
       return;
     }
-    host.innerHTML = `<button id="begin-discovery">${tr('discover')}</button>${run.phase === 'discovery' ? `<p class="dialog-note">${tr('discoverTip')}</p><div class="pairing" aria-label="${settings.lang === 'zh' ? '进入离开两两配对，剩一个端头' : 'Arrivals and departures pair, leaving one end'}">${level.nodes.map((n) => `<span>${n.id}: ${'Ⅱ'.repeat(Math.floor(degrees(level)[n.id] / 2))} •</span>`).join('')}</div><button id="explain-discovery" class="primary">${tr('explain')}</button>` : ''}<button id="counts-button" aria-pressed="${counts}">${tr('counts')}</button>`;
+    host.innerHTML = `<button id="begin-discovery">${tr('discover')}</button>${run.phase === 'discovery' ? `<p class="dialog-note">${tr('discoverTip')}</p><div class="pairing" role="img" aria-label="${settings.lang === 'zh' ? '进入离开两两配对，剩一个端头' : 'Arrivals and departures pair, leaving one end'}">${level.nodes.map((n) => `<span>${n.id}: ${'Ⅱ'.repeat(Math.floor(degrees(level)[n.id] / 2))} •</span>`).join('')}</div><button id="explain-discovery" class="primary">${tr('explain')}</button>` : ''}<button id="counts-button" aria-pressed="${counts}">${tr('counts')}</button>`;
     $('begin-discovery').onclick = () => {
       motion.cancel();
       run = { ...run, phase: 'discovery' };
@@ -428,17 +437,15 @@ export function startGame() {
   function submit(id) {
     if (document.hidden || $('dialog').open || $('stage').classList.contains('morphing')) return;
     if (run.phase === 'planning') {
-      const edit = level.candidateEdits.find((e) =>
-        e.kind === 'add' ? e.edge.id === id : e.edgeId === id,
-      );
-      if (edit) toggleEdit(edit.id);
+      if (bridgeAction(level, graph(), run, id) === 'edit') toggleEdit(candidateFor(level, id).id);
       else {
-        message = tr('protected');
+        message = tr(isProtected(level, id) ? 'protected' : 'notEditable');
         render();
       }
       return;
     }
     // Discovery and completed runs have no crossings to take; keep their guidance in place.
+    // Walking phases still reach move() so used or remote bridges explain why they are closed.
     if (!['walking', 'stuck'].includes(run.phase)) return;
     if (motion.busy) {
       motion.enqueue(id);
@@ -472,13 +479,15 @@ export function startGame() {
   }
   function selectNode(id) {
     if (document.hidden || motion.busy || $('dialog').open) return;
-    if (run.phase === 'discovery') {
+    const action = nodeAction(level, run, id);
+    if (!action) return;
+    if (action === 'toggle') {
       const selected = run.discoveryNodes.includes(id)
         ? run.discoveryNodes.filter((n) => n !== id)
         : [...run.discoveryNodes, id];
       run = { ...run, discoveryNodes: selected };
       message = '';
-    } else if (run.phase === 'walking' || run.phase === 'stuck') {
+    } else {
       run = chooseStart(level, run, id);
       message = '';
     }
@@ -491,7 +500,7 @@ export function startGame() {
       edges
         .map(
           (e) =>
-            `<button data-action="${e.id}">${tr('bridge')} ${escape(e.id)} · ${e.u} ↔ ${e.v}</button>`,
+            `<button data-action="${e.id}">${escape(bridgeLabel(level, graph(), run, e, settings.lang))}</button>`,
         )
         .join(''),
       (id) => {
@@ -506,16 +515,7 @@ export function startGame() {
       const g = graph();
       return {
         geo,
-        graph:
-          run.phase === 'planning'
-            ? {
-                ...g,
-                edges: [
-                  ...level.edges,
-                  ...level.candidateEdits.filter((e) => e.kind === 'add').map((e) => e.edge),
-                ],
-              }
-            : g,
+        graph: { ...g, edges: visibleEdges(level, g, run) },
         run,
         locked: motion.busy || run.phase === 'discovery' || $('dialog').open,
       };
@@ -524,9 +524,7 @@ export function startGame() {
     selectNode,
     chooseBridge,
   );
-  attachKeyboard($('stage'), submit, selectNode, () =>
-    availableEdges(graph(), run).map((e) => e.id),
-  );
+  attachKeyboard($('stage'), submit, selectNode, () => actionableBridges(level, graph(), run));
   $('undo-button').onclick = () => {
     motion.cancel();
     cancelPointer();
@@ -755,7 +753,7 @@ export function startGame() {
         capturedGraph,
         preview,
         geometry(capturedLevel, false),
-        { lang: settings.lang, view },
+        { lang: settings.lang, view, interactive: false },
       );
       $('replay-step').textContent = `${index} / ${total}`;
     };
@@ -831,6 +829,7 @@ export function startGame() {
       const g = l.kind === 'repair' ? applyEdits(l, r.edits).graph : l,
         saved = {
           ...newRun(l),
+          phase: 'complete',
           startNode: r.start,
           currentNode: r.start,
           walkedEdgeIds: includeRoute ? r.edges : [],
@@ -838,7 +837,10 @@ export function startGame() {
           draftEdits: r.edits,
         };
       const holder = document.createElement('div');
-      holder.innerHTML = citySVG(l, g, saved, geometry(l, false), { lang: settings.lang });
+      holder.innerHTML = citySVG(l, g, saved, geometry(l, false), {
+        lang: settings.lang,
+        interactive: false,
+      });
       const blob = await postcardBlob(holder.querySelector('svg'), {
         title: `${tr('title')} · ${nm(l.title)}`,
         subtitle: recordKey.startsWith('daily:') ? recordKey.split(':')[1] : l.id,

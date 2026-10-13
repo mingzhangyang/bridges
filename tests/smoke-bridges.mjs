@@ -142,8 +142,11 @@ try {
     async () => {
       await page.screenshot({ path: 'test-results/desktop-first-harbour.png', fullPage: true });
       const bridgeLabel = (id) => page.locator(`[data-bridge="${id}"]`).getAttribute('aria-label');
-      assert.equal(await bridgeLabel('b1'), 'Bridge b1 to North quay, available');
-      assert.equal(await bridgeLabel('b2'), 'Bridge b2: North quay ↔ South quay, not used');
+      assert.equal(await bridgeLabel('b1'), 'Bridge b1 to B · North quay, available');
+      assert.equal(
+        await bridgeLabel('b2'),
+        'Bridge b2: B · North quay ↔ C · South quay, not used',
+      );
       const p = await scenePoint(page, 'b1');
       await page.mouse.click(p.x, p.y);
       assert.equal(await page.locator('#progress-number').textContent(), '1 / 3');
@@ -155,7 +158,7 @@ try {
       await keyBridge(page, 'b2');
       await keyBridge(page, 'b3');
       assert.equal(await page.locator('#complete-banner').isVisible(), true);
-      assert.equal(await bridgeLabel('b1'), 'Bridge b1: Lighthouse ↔ North quay, used');
+      assert.equal(await bridgeLabel('b1'), 'Bridge b1: A · Lighthouse ↔ B · North quay, used');
       const completeMessage = await page.locator('#message').textContent();
       await keyBridge(page, 'b1');
       assert.equal(await page.locator('#message').textContent(), completeMessage);
@@ -286,7 +289,16 @@ try {
     },
   );
   await scenario('Nine-bridge construction and protected bridges', async () => {
+    await p.goto(`${base}/?lang=en#SB26`);
+    await keyBridge(p, 'b1');
+    assert.equal(
+      await p.locator('#message').textContent(),
+      'This bridge is not part of these works.',
+    );
+    assert.equal(await p.locator('[data-node]').first().getAttribute('role'), 'img');
     await p.goto(`${base}/?lang=en#SB32`);
+    await keyBridge(p, 'AB1');
+    assert.equal(await p.locator('#message').textContent(), 'This bridge is protected.');
     await p.locator('[data-edit="BC1"]').click();
     await p.locator('[data-edit="AD2"]').click();
     await p.screenshot({ path: 'test-results/night-blueprint.png', fullPage: true });
@@ -503,6 +515,20 @@ try {
       const idle = await motionPage.evaluate(() => window.rafRequests);
       await motionPage.waitForTimeout(150);
       assert.equal(await motionPage.evaluate(() => window.rafRequests), idle);
+      // Opening a dialog mid-walk cancels the animation without leaving the messenger mid-bridge.
+      await keyBridge(motionPage, 'b1');
+      await motionPage.locator('#settings-button').click();
+      await motionPage.locator('#dialog-close').click();
+      const [placed, expected] = await motionPage.evaluate(async () => {
+        const { geometry } = await import('/src/render/geometry.js');
+        const { getLevel } = await import('/src/content/levels.js');
+        const b = geometry(getLevel('SB01'), matchMedia('(max-width:700px)').matches).nodes.B;
+        return [
+          document.querySelector('.traveler').getAttribute('transform'),
+          `translate(${b.x},${b.y})`,
+        ];
+      });
+      assert.equal(placed, expected);
     },
   );
   await scenario(
