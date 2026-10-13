@@ -24,3 +24,44 @@ test('cancelling a morph owns cleanup of the stage lock across every caller', ()
     globalThis.cancelAnimationFrame = original;
   }
 });
+test('Completion animations are finite, cancellable and absent with reduced motion', () => {
+  const original = globalThis.cancelAnimationFrame;
+  globalThis.cancelAnimationFrame = () => {};
+  const animations = [];
+  const stage = {
+    querySelector: () => ({
+      animate: (frames, options) => {
+        const animation = {
+          frames,
+          options,
+          cancelled: false,
+          cancel() {
+            this.cancelled = true;
+          },
+        };
+        animations.push(animation);
+        return animation;
+      },
+    }),
+  };
+  try {
+    const reduced = motionController(
+      () => {},
+      () => true,
+    );
+    reduced.celebrate(stage);
+    assert.equal(animations.length, 0);
+    const motion = motionController(
+      () => {},
+      () => false,
+    );
+    motion.celebrate(stage);
+    assert.equal(animations.length, 2);
+    assert.ok(animations.every((a) => a.options.duration <= 1500));
+    motion.cancel();
+    assert.ok(animations.every((a) => a.cancelled));
+    assert.equal(motion.busy, false);
+  } finally {
+    globalThis.cancelAnimationFrame = original;
+  }
+});

@@ -1,5 +1,5 @@
-import { remainingGraph, components, degrees } from '../model/graph.js';
-import { residualFeasibility, targetEnd } from '../model/rules.js';
+import { remainingGraph, components, degrees, otherEnd } from '../model/graph.js';
+import { residualFeasibility, targetEnd, availableEdges } from '../model/rules.js';
 import { eulerRoute } from '../model/euler.js';
 import { undo } from '../model/commands.js';
 export function hint(graph, run, tier) {
@@ -37,7 +37,18 @@ export function hint(graph, run, tier) {
         .map(([id]) => id),
     };
   }
-  if (tier === 2) return { kind: 'pair', odd: possible.odd ?? [], groups: groups.length };
+  if (tier === 2) {
+    for (const edge of availableEdges(graph, run)) {
+      const destination = otherEnd(edge, run.currentNode);
+      const after = remainingGraph(remaining, [edge.id]);
+      const stranded = components(after)
+        .filter((group) => !group.includes(destination))
+        .flat();
+      const ids = after.edges.filter((e) => stranded.includes(e.u)).map((e) => e.id);
+      if (ids.length) return { kind: 'risk', edge: edge.id, destination, nodes: stranded, ids };
+    }
+    return { kind: 'choicesSafe' };
+  }
   const route = eulerRoute(remaining, run.currentNode, targetEnd(graph, run));
   return { kind: 'next', edge: route?.edges[0] };
 }

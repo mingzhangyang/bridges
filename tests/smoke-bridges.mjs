@@ -102,6 +102,46 @@ async function scenePoint(page, id, t = 0.5) {
     { id, t },
   );
 }
+async function tapControl(page, selector) {
+  const control = page.locator(selector);
+  await control.scrollIntoViewIfNeeded();
+  // Native mobile scrolling (including scroll anchoring after a scene change) suppresses
+  // taps briefly. Let it settle before a new finger gesture; never retry a dropped action.
+  await page.waitForTimeout(1000);
+  await control.tap();
+}
+async function bridgePoints(page, id, from) {
+  return page.evaluate(
+    async ({ id, from }) => {
+      const { geometry } = await import('/src/render/geometry.js');
+      const { getLevel } = await import('/src/content/levels.js');
+      const level = getLevel(document.getElementById('level-number').textContent);
+      const curve = geometry(level, matchMedia('(max-width:700px)').matches).curves[id];
+      const matrix = document.querySelector('#stage svg').getScreenCTM();
+      return Array.from({ length: 17 }, (_, i) => {
+        const p = curve.point(curve.canonical[0] === from ? i / 16 : 1 - i / 16);
+        const q = new DOMPoint(p.x, p.y).matrixTransform(matrix);
+        return { x: q.x, y: q.y };
+      });
+    },
+    { id, from },
+  );
+}
+async function dragBridge(page, id, from, touch = null) {
+  await page.locator('#stage').scrollIntoViewIfNeeded();
+  const points = await bridgePoints(page, id, from);
+  if (touch) {
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [points[0]] });
+    for (const point of points.slice(1))
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    await page.mouse.move(points[0].x, points[0].y);
+    await page.mouse.down();
+    for (const point of points.slice(1)) await page.mouse.move(point.x, point.y);
+    await page.mouse.up();
+  }
+}
 async function assertTextContrast(page, pairs) {
   const readings = await page.evaluate((checks) => {
     const luminance = (color) => {
@@ -128,6 +168,55 @@ async function assertTextContrast(page, pairs) {
     assert.ok(ratio >= 4.5, `${foreground} on ${background}: ${ratio.toFixed(2)}:1`);
 }
 try {
+  await scenario(
+    'One held drag crosses consecutive bridges with normal and reduced motion',
+    async () => {
+      for (const normalMotion of [true, false]) {
+        const { page, context } = await pageFor({ normalMotion });
+        await page.goto(`${base}/?lang=en`);
+        await page.waitForSelector('[data-bridge]');
+        await page.locator('#stage').scrollIntoViewIfNeeded();
+        const level = getLevel('SB01'),
+          route = eulerRoute(level, level.fixedStart);
+        let current = route.start,
+          count = 0;
+        for (const id of route.edges) {
+          const points = await bridgePoints(page, id, current);
+          if (count === 0) {
+            await page.mouse.move(points[0].x, points[0].y);
+            await page.mouse.down();
+          }
+          for (const point of points.slice(1)) await page.mouse.move(point.x, point.y);
+          count++;
+          assert.equal(
+            await page.locator('#progress-number').textContent(),
+            `${count} / ${level.edges.length}`,
+          );
+          const edge = level.edges.find((edge) => edge.id === id);
+          current = edge.u === current ? edge.v : edge.u;
+          // Keep the pointer held while the bounded 330 ms crossing animation unlocks.
+          // Render can already show the committed destination before that lock ends.
+          if (normalMotion) await page.waitForTimeout(400);
+          await page.waitForFunction(async (node) => {
+            const { geometry } = await import('/src/render/geometry.js');
+            const { getLevel } = await import('/src/content/levels.js');
+            const expected = geometry(getLevel('SB01')).nodes[node];
+            const matrix = document
+              .querySelector('#stage .traveler')
+              .transform.baseVal.consolidate()?.matrix;
+            return matrix && Math.hypot(matrix.e - expected.x, matrix.f - expected.y) < 0.01;
+          }, current);
+        }
+        await page.mouse.up();
+        assert.equal(await page.locator('#complete-banner').isVisible(), true);
+        assert.equal(
+          await page.locator('#progress-number').textContent(),
+          `${count} / ${level.edges.length}`,
+        );
+        await context.close();
+      }
+    },
+  );
   const { page, context } = await pageFor();
   await page.goto(`${base}/?lang=en`);
   await page.waitForSelector('[data-bridge]');
@@ -418,7 +507,106 @@ try {
       'Try starting at an island with an unpaired end.',
     );
   });
+  await scenario(
+    'Second hint identifies the connector and stranded side without revealing the next bridge',
+    async () => {
+      await p.goto(`${base}/?lang=en#SB08`);
+      await p.locator('#restart-button').click();
+      await p.locator('[data-node="C"]').focus();
+      await p.keyboard.press('Enter');
+      await p.locator('#hint-button').click();
+      await p.locator('#hint-button').click();
+      assert.match(await p.locator('#hint-detail').textContent(), /b7.*3 unvisited bridges/);
+      assert.equal(await p.locator('.bridge.risk').getAttribute('data-bridge'), 'b7');
+      assert.equal(await p.locator('.bridge.hinted').count(), 3);
+      await p.locator('#hint-button').click();
+      assert.match(await p.locator('#hint-detail').textContent(), /possible next bridge/);
+    },
+  );
+  await scenario(
+    'Historical pairing uses actual bridge ends and settles immediately with reduced motion',
+    async () => {
+      await p.goto(`${base}/?lang=en#SB24`);
+      await p.locator('#restart-button').click();
+      await p.locator('#begin-discovery').click();
+      for (const id of ['A', 'B', 'C', 'D']) {
+        await p.locator(`[data-node="${id}"]`).focus();
+        await p.keyboard.press('Enter');
+      }
+      await p.locator('#explain-discovery').click();
+      assert.equal(await p.locator('#pairing-lesson .paired-end').count(), 10);
+      assert.equal(await p.locator('#pairing-lesson .unpaired-end').count(), 4);
+      assert.equal(await p.locator('#pairing-lesson [data-pair-edges]').count(), 5);
+      assert.equal(
+        await p
+          .locator('#pairing-lesson')
+          .evaluate(
+            (el) =>
+              el.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length,
+          ),
+        0,
+      );
+      await p.locator('[data-action="replay-pairing"]').click();
+      await p.screenshot({ path: 'test-results/historical-pairing.png', fullPage: true });
+      await p.locator('[data-action="understand"]').click();
+      assert.equal(await p.locator('#complete-banner').isVisible(), true);
+    },
+  );
   await unlocked.context.close();
+  const dragSession = await pageFor({ mobile: true, unlocked: true });
+  const touch = await dragSession.context.newCDPSession(dragSession.page);
+  await scenario(
+    'Every solvable city and engineering route works through real mobile touch corridors',
+    async () => {
+      const page = dragSession.page;
+      for (const level of allLevels.filter((level) => level.kind !== 'discovery')) {
+        await page.goto(`${base}/?lang=en#${level.id}`);
+        await page.waitForSelector('[data-bridge]');
+        let route,
+          graph = level;
+        if (level.kind === 'repair') {
+          const proof = repairSolution(level);
+          route = proof.route;
+          graph = applyEdits(level, proof.ids).graph;
+          for (const id of proof.ids) {
+            await tapControl(page, `[data-edit="${id}"]`);
+            await page.locator(`[data-edit="${id}"][aria-pressed="true"]`).waitFor();
+          }
+          await tapControl(page, '#confirm-blueprint');
+          await page.locator('#edit-blueprint').waitFor({ state: 'visible' });
+        } else {
+          await tapControl(page, '#restart-button');
+          route = eulerRoute(
+            level,
+            level.fixedStart,
+            level.objective === 'return' ? level.fixedStart : level.fixedEnd,
+          );
+        }
+        if (!level.fixedStart) await tapControl(page, `[data-node="${route.start}"] .node-dot`);
+        let current = route.start,
+          count = 0;
+        for (const id of route.edges) {
+          await dragBridge(page, id, current, touch);
+          const edge = graph.edges.find((edge) => edge.id === id);
+          current = edge.u === current ? edge.v : edge.u;
+          count++;
+          assert.equal(
+            await page.locator('#progress-number').textContent(),
+            `${count} / ${graph.edges.length}`,
+            `${level.id}/${id}: ${await page.locator('#message').textContent()}`,
+          );
+        }
+        assert.equal(await page.locator('#complete-banner').isVisible(), true, level.id);
+        console.log(`  touch ${level.id}`);
+        if (['SB25', 'SB32'].includes(level.id))
+          await page.screenshot({
+            path: `test-results/${level.id}-touch-complete.png`,
+            fullPage: true,
+          });
+      }
+    },
+  );
+  await dragSession.context.close();
   const mobile = await pageFor({ mobile: true });
   await mobile.page.goto(`${base}/?lang=zh`);
   await mobile.page.waitForSelector('[data-bridge]');

@@ -114,6 +114,7 @@ export const levels = specs.map(([title, pairs, opts], i) =>
 );
 // Stable historical IDs distinguish both parallel bridges and match the design witnesses.
 for (const i of [22, 23]) {
+  levels[i].layout = 'historical';
   ['AB1', 'AB2', 'AC1', 'AC2', 'AD', 'BD', 'CD', 'BC1'].forEach((id, k) => {
     if (levels[i].edges[k]) levels[i].edges[k].id = id;
   });
@@ -209,6 +210,7 @@ export const commissions = [
     candidateEdits: [add('BC', 'B', 'C'), add('BE', 'B', 'E'), add('CD', 'C', 'D')],
   }),
   engineering('EC03', ['南岸急信', 'Express to South quay'], 'AB AB AC AC AD BD CD', {
+    layout: 'historical',
     fixedStart: 'B',
     fixedEnd: 'C',
     budget: 1,

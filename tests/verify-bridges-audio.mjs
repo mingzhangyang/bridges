@@ -46,7 +46,7 @@ test('unmuted preference can activate sound on a new walk and resume after backg
     assert.equal(await audio.step('wood'), true);
     audio.suspend();
     assert.equal(await audio.step('iron'), true);
-    assert.equal(calls.played, 2);
+    assert.equal(calls.played, 4); // Two quiet footsteps per crossing.
     assert.equal(calls.created, 1);
     assert.equal(calls.resumed, 2);
   } finally {
@@ -62,6 +62,29 @@ test('an asynchronous audio activation cannot play after the user mutes or backg
     assert.equal(await audio.step('wood', () => false), false);
     assert.equal(calls.played, 0);
     assert.equal(calls.suspended, 1);
+  } finally {
+    globalThis.AudioContext = original;
+  }
+});
+
+test('cancellation invalidates pending activation even if the same run is still active', async () => {
+  const { Audio, calls } = fakeAudio(),
+    original = globalThis.AudioContext;
+  let finishResume;
+  Audio.prototype.resume = function () {
+    this.state = 'running';
+    return new Promise((resolve) => {
+      finishResume = resolve;
+    });
+  };
+  globalThis.AudioContext = Audio;
+  try {
+    const audio = audioService();
+    const pending = audio.step('wood', () => true, true);
+    audio.suspend();
+    finishResume();
+    assert.equal(await pending, false);
+    assert.equal(calls.played, 0);
   } finally {
     globalThis.AudioContext = original;
   }

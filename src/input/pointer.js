@@ -1,5 +1,5 @@
-import { hits, sweep, distance } from './bridge-hit-test.js';
-import { otherEnd } from '../model/graph.js';
+import { hits, distance } from './bridge-hit-test.js';
+import { beginTrace, advanceTrace, traceArrivals } from './bridge-trace.js';
 export function attachPointer(stage, state, submit, selectNode, choose) {
   let gesture = null;
   const point = (e) => {
@@ -15,11 +15,9 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
     gesture = {
       id: e.pointerId,
       start: p,
-      last: p,
       moved: false,
       committed: false,
-      edge: null,
-      progress: 0,
+      trace: null,
       node: e.target.closest('[data-node]')?.dataset.node ?? null,
     };
     stage.setPointerCapture(e.pointerId);
@@ -36,49 +34,44 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
       return;
     }
     if (!locked && gesture.moved && run.currentNode) {
-      const origin = geo.nodes[run.currentNode];
-      for (const q of sweep(gesture.last, p)) {
-        if (!gesture.edge) {
-          if (distance(gesture.start, origin) > 46) break;
-          const candidates = hits(
-            q,
-            geo,
-            graph.edges.filter((edge) => walkable(edge.id)),
-          );
-          // Wait until separated corridors identify exactly one bridge. Never guess at overlap.
-          if (candidates.length === 1 && distance(q, origin) > 38 && distance(q, origin) < 75)
-            gesture.edge = candidates[0];
-        } else {
-          const curve = geo.curves[gesture.edge.id],
-            inside = hits(q, geo, [gesture.edge], 30).length;
-          if (!inside) {
-            gesture.edge = null;
-            break;
-          }
-          gesture.progress = Math.max(gesture.progress, distance(q, origin));
-          const destination = geo.nodes[otherEnd(gesture.edge, run.currentNode)];
-          if (distance(q, destination) < 35 && gesture.progress > 60) {
-            gesture.committed = true;
-            submit(gesture.edge.id);
-            gesture.edge = null;
-            gesture.start = destination;
-            gesture.progress = 0;
-            break;
-          }
-        }
+      gesture.trace ??= beginTrace(
+        geo,
+        graph.edges.filter((edge) => walkable(edge.id)),
+        run.currentNode,
+        gesture.start,
+      );
+      gesture.trace = advanceTrace(gesture.trace, p, geo);
+      if (gesture.trace?.complete) {
+        const edge = gesture.trace.complete,
+          destination = edge.u === gesture.trace.node ? edge.v : edge.u;
+        // Finish the local transition before calling out: submit may update the run
+        // in place, replace it, or cancel this gesture during a scene change.
+        gesture.committed = true;
+        gesture.trace = null;
+        gesture.start = geo.nodes[destination];
+        submit(edge.id);
       }
     }
-    gesture.last = p;
   });
   stage.addEventListener('pointerup', (e) => {
     if (!gesture || gesture.id !== e.pointerId) return;
     const g = gesture;
     gesture = null;
     stage.releasePointerCapture(e.pointerId);
-    if (g.moved || g.committed) return;
-    const { geo, graph, canSelectNode, actionable } = state(),
+    const { geo, graph, canSelectNode, actionable, locked } = state(),
       p = point(e);
     if (!p) return;
+    if (g.moved || g.committed) {
+      if (!locked) {
+        // A release may arrive without a final move event. Sweep it just like a move
+        // before accepting either a unique crossing or an ambiguous bridge choice.
+        const trace = advanceTrace(g.trace, p, geo);
+        const arrived = trace?.complete ? [trace.complete] : traceArrivals(trace, p, geo);
+        if (arrived.length > 1) choose(arrived);
+        else if (arrived.length === 1) submit(arrived[0].id);
+      }
+      return;
+    }
     // Capture retargets pointerup to the stage. Preserve the pressed island explicitly; an island
     // that cannot be chosen now lets the press fall through to the bridge ends drawn over it.
     const node =

@@ -1083,3 +1083,78 @@ dialog::backdrop {
     font-size: 18px;
   }
 }
+
+.city-world {
+  transform-origin: 50% 50%;
+}
+.journey-complete .city-world {
+  transform: scale(0.97);
+}
+.reflections {
+  opacity: 0.24;
+  pointer-events: none;
+}
+.bridge.risk .bridge-rail {
+  stroke: #a14f38;
+  stroke-width: 28;
+  stroke-dasharray: 9 5;
+}
+.pairing-diagram {
+  background: var(--water);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pairing-diagram .city-scene {
+  max-height: 48dvh;
+  min-height: 0;
+}
+.endpoint-pairings {
+  pointer-events: none;
+}
+.endpoint-pair {
+  animation: pair-arrival 400ms ease-out both;
+  animation-delay: var(--pair-delay);
+}
+.endpoint-pair path {
+  fill: none;
+  stroke: #b87222;
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+.paired-end {
+  fill: #ffe2a8;
+  stroke: #825420;
+  stroke-width: 3;
+}
+.unpaired-end {
+  fill: #fff4d7;
+  stroke: #a3432f;
+  stroke-width: 6;
+  stroke-dasharray: 3 2;
+  animation: pair-arrival 350ms ease-out 1900ms both;
+}
+.pairing-key {
+  list-style: none;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.pairing-key li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pairing-key b {
+  display: block;
+  color: var(--gold-text);
+}
+@keyframes pair-arrival {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
