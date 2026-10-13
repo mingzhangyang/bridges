@@ -102,6 +102,33 @@ async function scenePoint(page, id, t = 0.5) {
     { id, t },
   );
 }
+async function assertTextContrast(page, pairs) {
+  const readings = await page.evaluate((checks) => {
+    const luminance = (color) => {
+      const rgb = color
+        .match(/[\\d.]+/g)
+        .slice(0, 3)
+        .map((part) => Number(part) / 255)
+        .map((value) =>
+          value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
+        );
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+    };
+    return checks.map(([foreground, background]) => {
+      const ink = getComputedStyle(document.querySelector(foreground)).color;
+      const paper = getComputedStyle(document.querySelector(background)).backgroundColor;
+      const a = luminance(ink);
+      const b = luminance(paper);
+      return {
+        foreground,
+        background,
+        ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+      };
+    });
+  }, pairs);
+  for (const { foreground, background, ratio } of readings)
+    assert.ok(ratio >= 4.5, `${foreground} on ${background}: ${ratio.toFixed(2)}:1`);
+}
 try {
   const { page, context } = await pageFor();
   await page.goto(`${base}/?lang=en`);
@@ -136,6 +163,31 @@ try {
       await page.locator('#dialog-close').click();
     },
   );
+  await scenario('Both themes meet text contrast for map, route and completion UI', async () => {
+    for (const theme of ['light', 'dark']) {
+      await page.locator('#settings-button').click();
+      await page.locator('#theme-select').selectOption(theme);
+      await page.locator('#dialog-close').click();
+      await assertTextContrast(page, [
+        ['.map-topline', '.map-panel'],
+        ['.map-bottomline', '.map-panel'],
+        ['#route-history', 'body'],
+        ['#complete-banner small', '#complete-banner'],
+        ['#next-level', '#next-level'],
+      ]);
+      await page.locator('#map-button').click();
+      await assertTextContrast(page, [
+        ['.level-card small', '.level-card'],
+        ['.level-card strong', '.level-card'],
+      ]);
+      await page.locator('[data-action="tab:collection"]').click();
+      await assertTextContrast(page, [['.stamp', 'dialog']]);
+      await page.locator('#dialog-close').click();
+    }
+    await page.locator('#settings-button').click();
+    await page.locator('#theme-select').selectOption('light');
+    await page.locator('#dialog-close').click();
+  });
   await scenario(
     'Lens preserves the entire logical route and setting preference beats URL',
     async () => {

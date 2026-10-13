@@ -6,9 +6,14 @@
   --muted: #596968;
   --line: #d9dbcc;
   --accent: #447e7a;
+  --accent-hover: #3a6f6b;
+  --accent-text: #3a6f6b;
+  --on-accent: #fff;
   --gold: #b18b50;
+  --gold-text: #7e5d2d;
   --soft: #e8e8db;
   --water: #c2dcdf;
+  --map-label: #2b4c53;
   font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   font-synthesis: none;
 }
@@ -58,11 +63,12 @@ a:focus-visible,
 }
 button.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 button.primary:hover {
-  filter: brightness(1.1);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 .app-shell {
   max-width: 1450px;
@@ -175,7 +181,7 @@ h1 {
   justify-content: space-between;
   align-items: center;
   padding: 18px 24px;
-  color: #4d757d;
+  color: var(--map-label);
   font-size: 10px;
   letter-spacing: 1.8px;
   z-index: 1;
@@ -435,7 +441,7 @@ h1 {
 }
 #route-history {
   font: 14px monospace;
-  color: var(--accent);
+  color: var(--accent-text);
   line-height: 2;
   min-height: 30px;
   overflow-wrap: anywhere;
@@ -517,7 +523,7 @@ footer a:hover {
 #complete-banner small {
   display: block;
   margin-top: 6px;
-  color: #887b5e;
+  color: var(--gold-text);
   font-size: 10px;
 }
 #complete-banner button {
@@ -609,12 +615,12 @@ dialog::backdrop {
   font:
     20px Georgia,
     serif;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-bottom: 6px;
 }
 .level-card small {
   font-size: 9px;
-  color: var(--gold);
+  color: var(--gold-text);
 }
 .dialog-tabs {
   display: flex;
@@ -661,7 +667,7 @@ dialog::backdrop {
 }
 .works-list button[aria-pressed='true'] {
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 #engineering small {
   font-size: 11px;
@@ -671,7 +677,7 @@ dialog::backdrop {
   display: flex;
   justify-content: space-between;
   padding: 16px 0;
-  color: var(--gold);
+  color: var(--gold-text);
   font-size: 21px;
 }
 .stamp {
@@ -682,7 +688,7 @@ dialog::backdrop {
   height: 48px;
   line-height: 48px;
   text-align: center;
-  color: var(--gold);
+  color: var(--gold-text);
   font-size: 20px;
   transform: rotate(-8deg);
   margin-right: 10px;
@@ -718,9 +724,14 @@ dialog::backdrop {
   --muted: #a8bcb9;
   --line: #496065;
   --accent: #73a79b;
+  --accent-hover: #8bbcb0;
+  --accent-text: #9ecbc0;
+  --on-accent: #142d32;
   --soft: #344a50;
   --gold: #d6b878;
-  --water: #6b929f;
+  --gold-text: #d6b878;
+  --water: #405760;
+  --map-label: #eff8f4;
 }
 [data-theme='dark'] .map-panel {
   filter: brightness(0.8) saturate(0.8);
@@ -730,9 +741,6 @@ dialog::backdrop {
 }
 [data-theme='dark'] #complete-banner strong {
   color: #e9d6a9;
-}
-[data-theme='dark'] #complete-banner small {
-  color: #c3b79b;
 }
 @media (min-width: 1450px) {
   .city-scene {
