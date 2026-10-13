@@ -109,9 +109,7 @@ async function assertTextContrast(page, pairs) {
         .match(/[0-9.]+/g)
         .slice(0, 3)
         .map((part) => Number(part) / 255)
-        .map((value) =>
-          value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
-        );
+        .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
       return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
     };
     return checks.map(([foreground, background]) => {
