@@ -137,6 +137,8 @@ export function restoreRun(level, saved) {
           })
           .slice(-100)
       : [];
+    base.hintTier = [1, 2, 3].includes(saved.hintTier) ? saved.hintTier : 0;
+    base.explained = saved.explained === true;
     base.discoveryNodes = (saved.discoveryNodes ?? []).filter((n) =>
       level.nodes.some((v) => v.id === n),
     );

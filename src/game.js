@@ -182,6 +182,8 @@ export function startGame() {
     ])
       $(id).textContent = tr(text);
     $('settings-button').ariaLabel = tr('settings');
+    $('main-nav').ariaLabel = tr('mainNav');
+    $('journey-controls').ariaLabel = tr('journeyControls');
     $('daily-date').textContent = dailyEntry()?.date ?? '—';
     $('chapter-label').textContent = nm([
       chapters[level.chapter - 1]?.zh,
@@ -262,7 +264,7 @@ export function startGame() {
         0,
       );
       host.innerHTML = `<small>${tr('budget')} · ${cost} / ${level.budget}</small><p class="dialog-note">${tr('serviceAreas')} · ${level.protectedEdges.length ? `${tr('protectedCount')}: ${level.protectedEdges.length}` : ''}</p><div class="works-list">${level.candidateEdits
-        .filter((edit) => edit.kind !== 'remove' || !level.protectedEdges.includes(edit.edgeId))
+        .filter((edit) => !(edit.kind === 'remove' && isProtected(level, edit.edgeId)))
         .map(
           (edit) =>
             `<button data-edit="${edit.id}" aria-pressed="${run.draftEdits.includes(edit.id)}"><span>${tr(edit.kind)} · ${escape(bridgeName(level, edit.kind === 'add' ? edit.edge : level.edges.find((e) => e.id === edit.edgeId), settings.lang))}</span><span>${run.draftEdits.includes(edit.id) ? '✓' : '+'}</span></button>`,
@@ -517,6 +519,8 @@ export function startGame() {
         geo,
         graph: { ...g, edges: visibleEdges(level, g, run) },
         run,
+        canSelectNode: (id) => !!nodeAction(level, run, id),
+        walkable: (id) => bridgeAction(level, g, run, id) === 'walk',
         locked: motion.busy || run.phase === 'discovery' || $('dialog').open,
       };
     },

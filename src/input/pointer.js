@@ -29,13 +29,13 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
     const p = point(e);
     if (!p) return;
     if (distance(p, gesture.start) > 10) gesture.moved = true;
-    const { geo, graph, run, locked } = state();
+    const { geo, graph, run, locked, walkable } = state();
     if (p.x < 0 || p.y < 0 || p.x > geo.w || p.y > geo.h) {
       gesture = null;
       if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
       return;
     }
-    if (!locked && gesture.moved && run.currentNode && run.phase !== 'planning') {
+    if (!locked && gesture.moved && run.currentNode) {
       const origin = geo.nodes[run.currentNode];
       for (const q of sweep(gesture.last, p)) {
         if (!gesture.edge) {
@@ -43,9 +43,7 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
           const candidates = hits(
             q,
             geo,
-            graph.edges.filter(
-              (edge) => otherEnd(edge, run.currentNode) && !run.walkedEdgeIds.includes(edge.id),
-            ),
+            graph.edges.filter((edge) => walkable(edge.id)),
           );
           // Wait until separated corridors identify exactly one bridge. Never guess at overlap.
           if (candidates.length === 1 && distance(q, origin) > 38 && distance(q, origin) < 75)
@@ -78,11 +76,13 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
     gesture = null;
     stage.releasePointerCapture(e.pointerId);
     if (g.moved || g.committed) return;
-    const { geo, graph } = state(),
+    const { geo, graph, canSelectNode } = state(),
       p = point(e);
     if (!p) return;
-    // Capture retargets pointerup to the stage. Preserve the pressed island explicitly.
-    const node = g.node && distance(p, geo.nodes[g.node]) <= 43 ? g.node : null;
+    // Capture retargets pointerup to the stage. Preserve the pressed island explicitly; an island
+    // that cannot be chosen now lets the press fall through to the bridge ends drawn over it.
+    const node =
+      g.node && canSelectNode(g.node) && distance(p, geo.nodes[g.node]) <= 43 ? g.node : null;
     if (node) {
       selectNode(node);
       return;

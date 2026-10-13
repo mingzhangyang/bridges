@@ -127,6 +127,8 @@ const strings = {
   ],
   chooseBridge: ['这里有两座桥，请明确选择。', 'Two bridges overlap here. Choose one.'],
   bridge: ['桥', 'Bridge'],
+  mainNav: ['主导航', 'Main'],
+  journeyControls: ['旅程操作', 'Journey controls'],
   toward: ['，通往 ', ' to '],
   labelSep: ['：', ': '],
   stateSep: ['，', ', '],

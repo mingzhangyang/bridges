@@ -83,6 +83,10 @@ test('save restoration rebuilds location and history, rejects contradictory stat
   assert.equal(restoreRun(l, { ...r, history: ['A', 'C'] }), null);
   assert.equal(restoreRun(l, { ...r, walkedEdgeIds: ['b1', 'b1'] }), null);
   assert.equal(restoreRun(l, { ...r, levelRevision: 99 }), null);
+  const odd = restoreRun(l, { ...r, hintTier: 'a', explained: 'yes' });
+  assert.equal(odd.hintTier, 0);
+  assert.equal(odd.explained, false);
+  assert.equal(restoreRun(l, { ...r, hintTier: 2 }).hintTier, 2);
 });
 test('graph rejects self loops and ambiguous identifiers', () => {
   assert.throws(() =>
