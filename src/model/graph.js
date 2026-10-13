@@ -1,4 +1,7 @@
+const isId = (id) => typeof id === 'string' && id !== '';
 export function validateGraph(graph) {
+  if (!graph.nodes.every((n) => isId(n.id)) || !graph.edges.every((e) => isId(e.id)))
+    throw new Error('Duplicate or missing IDs');
   const nodes = new Set(graph.nodes.map((n) => n.id));
   const edges = new Set(graph.edges.map((e) => e.id));
   if (!nodes.size || nodes.size !== graph.nodes.length || edges.size !== graph.edges.length)

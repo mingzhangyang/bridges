@@ -89,6 +89,12 @@ test('graph rejects self loops and ambiguous identifiers', () => {
     validateGraph({ nodes: [{ id: 'A' }], edges: [{ id: 'a', u: 'A', v: 'A' }] }),
   );
   assert.throws(() => validateGraph({ nodes: [{ id: 'A' }, { id: 'A' }], edges: [] }));
+  assert.throws(() =>
+    validateGraph({ nodes: [{ id: 'A' }, { id: '' }], edges: [{ id: 'a', u: 'A', v: '' }] }),
+  );
+  assert.throws(() =>
+    validateGraph({ nodes: [{ id: 'A' }, { id: 'B' }], edges: [{ u: 'A', v: 'B' }] }),
+  );
 });
 
 test('discovery phase and blueprint undo history survive restoration', () => {

@@ -553,6 +553,8 @@ dialog {
   width: calc(100% - 32px);
   padding: 28px;
   max-height: 88dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 25px 100px #1a394533;
 }
 dialog::backdrop {
