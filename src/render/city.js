@@ -86,7 +86,9 @@ export function citySVG(
             ? say('已拆除', 'removed')
             : toward
               ? say('可通行', 'available')
-              : '';
+              : planning
+                ? ''
+                : say('未走', 'not used');
     bridges += `<g class="bridge ${walked ? 'walked' : ''} ${active && !walked ? 'available' : ''} ${ghost ? 'ghost' : ''} ${removed ? 'removed' : ''} ${hintIds.includes(edge.id) ? 'hinted' : ''}" data-bridge="${edge.id}" role="button" tabindex="0" aria-label="${esc(state ? `${label}${say('，', ', ')}${state}` : label)}"><path class="bridge-shadow" d="${curve.path}" transform="translate(3,9)"/><path class="bridge-rail" d="${curve.path}"/><path class="bridge-deck" d="${curve.path}" stroke="${color}"/><path class="bridge-grain" d="${curve.path}"/><path class="bridge-hit" d="${curve.path}" style="stroke-width:${geo.w === 720 ? 88 : 48}"/>${walked ? `<circle cx="${curve.point(0.5).x}" cy="${curve.point(0.5).y}" r="5" fill="#ffe2a8"/>` : ''}${ghost ? `<text x="${curve.point(0.5).x}" y="${curve.point(0.5).y + 5}" class="slot-label">+</text>` : ''}</g>`;
   }
   const pos = geo.nodes[run.currentNode] ?? { x: -100, y: -100 };

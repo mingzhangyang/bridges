@@ -143,7 +143,7 @@ try {
       await page.screenshot({ path: 'test-results/desktop-first-harbour.png', fullPage: true });
       const bridgeLabel = (id) => page.locator(`[data-bridge="${id}"]`).getAttribute('aria-label');
       assert.equal(await bridgeLabel('b1'), 'Bridge b1 to North quay, available');
-      assert.equal(await bridgeLabel('b2'), 'Bridge b2: North quay ↔ South quay');
+      assert.equal(await bridgeLabel('b2'), 'Bridge b2: North quay ↔ South quay, not used');
       const p = await scenePoint(page, 'b1');
       await page.mouse.click(p.x, p.y);
       assert.equal(await page.locator('#progress-number').textContent(), '1 / 3');
