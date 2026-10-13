@@ -110,13 +110,13 @@ try {
     const ratios = await page.evaluate(() => {
       const css = getComputedStyle(document.documentElement);
       const luminance = (hex) => {
-        const channels = hex
-          .trim()
-          .replace('#', '')
-          .match(/.{2}/g)
-          .map((part) => parseInt(part, 16) / 255)
-          .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
-        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+        const values = [0, 1, 2].map((channel) => {
+          const offset = channel * 2 + 1;
+          const value = Number.parseInt(hex.trim().slice(offset, offset + 2), 16) / 255;
+          if (value <= 0.04045) return value / 12.92;
+          return ((value + 0.055) / 1.055) ** 2.4;
+        });
+        return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
       };
       const foreground = luminance(css.getPropertyValue('--muted'));
       return ['--paper', '--panel', '--soft'].map((background) => {
