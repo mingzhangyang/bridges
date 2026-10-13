@@ -60,7 +60,10 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
     if (!p) return;
     if (g.moved || g.committed) {
       if (!locked) {
-        const arrived = traceArrivals(g.trace, p, geo);
+        // A release may arrive without a final move event. Sweep it just like a move
+        // before accepting either a unique crossing or an ambiguous bridge choice.
+        const trace = advanceTrace(g.trace, p, geo);
+        const arrived = trace?.complete ? [trace.complete] : traceArrivals(trace, p, geo);
         if (arrived.length > 1) choose(arrived);
         else if (arrived.length === 1) submit(arrived[0].id);
       }
