@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { allLevels } from '../src/content/levels.js';
 import { geometry } from '../src/render/geometry.js';
 import { beginTrace, advanceTrace } from '../src/input/bridge-trace.js';
+import { placeNames } from '../src/render/city.js';
 
 for (const portrait of [false, true]) {
   test(`Every built and candidate corridor clears unrelated waterfronts (${portrait ? 'portrait' : 'landscape'})`, () => {
@@ -62,4 +63,33 @@ test('A drag leaving every corridor cannot join a different bridge at a crossing
   trace = advanceTrace(trace, geo.nodes.B, geo);
   assert.equal(trace.complete, undefined);
   assert.deepEqual(trace.candidates, []);
+});
+test('Island names never sit on a bridge deck, another island or another name', () => {
+  for (const level of allLevels)
+    for (const portrait of [false, true])
+      for (const lang of ['zh', 'en'])
+        for (const counts of [false, true]) {
+          const geo = geometry(level, portrait),
+            names = placeNames(level, geo, lang, counts);
+          // clear is the gap past a bridge's railing; a 7 px deck half-width stays free.
+          for (const [id, name] of Object.entries(names))
+            assert.ok(
+              name.clear >= -7,
+              `${level.id} ${portrait ? 'portrait' : 'landscape'} ${lang}${counts ? ' counts' : ''}: ${id}`,
+            );
+        }
+});
+test('Every bridge lands on the quays of both its islands', () => {
+  for (const level of allLevels) {
+    const geo = geometry(level, false);
+    for (const curve of Object.values(geo.curves)) {
+      const [from, to] = curve.ends;
+      assert.ok(from.t > 0 && from.t < to.t && to.t < 1);
+      for (const [end, node] of [
+        [from, curve.a],
+        [to, curve.b],
+      ])
+        assert.ok(Math.abs(((end.x - node.x) / 66) ** 2 + ((end.y - node.y) / 42) ** 2 - 1) < 0.01);
+    }
+  }
 });

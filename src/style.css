@@ -202,6 +202,8 @@ h1 {
   min-height: 0;
   touch-action: none;
   position: relative;
+  /* The scene's water bleeds past its viewBox to fill whatever shape the panel takes. */
+  overflow: hidden;
   display: grid;
   place-items: center;
 }
@@ -212,6 +214,11 @@ h1 {
   overflow: visible;
 }
 .terrain,
+.terrain-props,
+.streets,
+.sky,
+.abutments,
+.lamps,
 .water-texture,
 .node-dot,
 .node-letter,
@@ -225,6 +232,72 @@ h1 {
 }
 .bridge.actionable {
   cursor: pointer;
+}
+.bridge-halo {
+  fill: none;
+  stroke: #fff6dc;
+  stroke-width: 36;
+  stroke-linecap: round;
+  opacity: 0;
+  pointer-events: none;
+}
+.bridge.available .bridge-halo {
+  opacity: 0.7;
+  animation: bridge-ready 1.8s ease-in-out infinite alternate;
+}
+.bridge.walked .bridge-halo {
+  stroke: #ffcf73;
+  opacity: 0.4;
+}
+@keyframes bridge-ready {
+  from {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+.street {
+  fill: none;
+  stroke: #efe7cd;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.street.walked {
+  stroke: #f4cf8a;
+}
+.street.removed {
+  opacity: 0.3;
+}
+.abutment,
+.abutment-cap {
+  fill: none;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.abutment {
+  stroke: #6f6a55;
+  stroke-width: 8;
+}
+.abutment-cap {
+  stroke: #e2d8bd;
+  stroke-width: 4;
+}
+.bridge.walked .abutment-cap {
+  stroke: #ffe2a8;
+}
+.bridge.ghost .abutments {
+  opacity: 0;
+}
+.lamps {
+  fill: #fff1c9;
+  stroke: #c98a3a;
+  stroke-width: 1.5;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px #ffcf73);
+}
+.plaza-glow {
+  opacity: 0;
 }
 .bridge-shadow {
   fill: none;
@@ -256,6 +329,23 @@ h1 {
   stroke: transparent;
   stroke-width: 40;
   pointer-events: stroke;
+}
+/* Map elements show focus on their own shape; a box around a curved bridge reads as a frame. */
+.city-scene [tabindex]:focus-visible {
+  outline: none;
+}
+.bridge:focus-visible .bridge-halo {
+  stroke: #fff;
+  opacity: 0.95;
+  animation: none;
+}
+.node:focus-visible .node-dot {
+  stroke: var(--gold);
+  stroke-width: 5;
+  opacity: 1;
+}
+.bridge.available .bridge-rail {
+  stroke: #4f7f76;
 }
 .bridge.actionable:hover .bridge-rail,
 .bridge:focus .bridge-rail {
@@ -312,9 +402,15 @@ h1 {
 }
 .land-name {
   font-size: 14px;
-  fill: #3c6570;
+  fill: #2f5864;
   letter-spacing: 1px;
   pointer-events: none;
+  /* A halo of water colour keeps the name readable wherever it lands. */
+  paint-order: stroke;
+  stroke: #e3eeec;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  stroke-opacity: 0.85;
 }
 .degree rect {
   fill: #fff5d9;
@@ -334,12 +430,24 @@ h1 {
   pointer-events: none;
 }
 .graph-view .terrain,
+.graph-view .terrain-props,
+.graph-view .streets,
+.graph-view .sky,
 .graph-view .water-texture {
   opacity: 0.08;
 }
 .graph-view .bridge-shadow,
-.graph-view .bridge-grain {
+.graph-view .bridge-grain,
+.graph-view .abutments,
+.graph-view .lamps {
   opacity: 0;
+}
+/* The lens reads edges node to node, so bridges are no longer cut at the quay. */
+.graph-view .span {
+  mask: none;
+}
+.graph-view .bridge-halo {
+  stroke-width: 18;
 }
 .graph-view .bridge-rail {
   stroke-width: 5;
@@ -1006,7 +1114,37 @@ dialog::backdrop {
 }
 
 .atmosphere-4 .land-name {
-  fill: #d0dedc;
+  fill: #e6efe9;
+  stroke: #1d354a;
+}
+/* Harbour of lights: dusk-dark houses, lit windows and lamplight on every square. */
+.atmosphere-4 .wall {
+  fill: #a9a592;
+}
+.atmosphere-4 .wall-side {
+  fill: #6f6b5d;
+}
+.atmosphere-4 .window {
+  fill: #ffd77d;
+  filter: drop-shadow(0 0 3px #ffc65c);
+}
+.atmosphere-4 .door {
+  fill: #e8a955;
+}
+.atmosphere-4 .plaza-glow {
+  opacity: 1;
+}
+.atmosphere-4 .street {
+  stroke: #c9c2a4;
+}
+.atmosphere-4 .street.walked {
+  stroke: #ffd48a;
+}
+.atmosphere-4 .tree {
+  fill: #35525a;
+}
+.graph-view .plaza-glow {
+  opacity: 0;
 }
 .atmosphere-4 .node-letter {
   fill: #486573;
