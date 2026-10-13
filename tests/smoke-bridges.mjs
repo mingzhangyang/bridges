@@ -141,6 +141,9 @@ try {
     'Desktop first harbour, click route, undo, reload and completed postcard',
     async () => {
       await page.screenshot({ path: 'test-results/desktop-first-harbour.png', fullPage: true });
+      const bridgeLabel = (id) => page.locator(`[data-bridge="${id}"]`).getAttribute('aria-label');
+      assert.equal(await bridgeLabel('b1'), 'Bridge b1 to North quay, available');
+      assert.equal(await bridgeLabel('b2'), 'Bridge b2: North quay ↔ South quay');
       const p = await scenePoint(page, 'b1');
       await page.mouse.click(p.x, p.y);
       assert.equal(await page.locator('#progress-number').textContent(), '1 / 3');
@@ -151,6 +154,11 @@ try {
       assert.equal(await page.locator('#progress-number').textContent(), '1 / 3');
       await keyBridge(page, 'b2');
       await keyBridge(page, 'b3');
+      assert.equal(await page.locator('#complete-banner').isVisible(), true);
+      assert.equal(await bridgeLabel('b1'), 'Bridge b1: Lighthouse ↔ North quay, used');
+      const completeMessage = await page.locator('#message').textContent();
+      await keyBridge(page, 'b1');
+      assert.equal(await page.locator('#message').textContent(), completeMessage);
       assert.equal(await page.locator('#complete-banner').isVisible(), true);
       await page.locator('#postcard-button').click();
       const downloadPromise = page.waitForEvent('download');
@@ -255,9 +263,15 @@ try {
       assert.equal(await p.locator('#counts-button').getAttribute('aria-pressed'), 'false');
       await p.reload();
       assert.equal(await p.locator('#counts-button').getAttribute('aria-pressed'), 'false');
+      const discoveryMessage = await p.locator('#message').textContent();
+      await keyBridge(p, 'AB1');
+      assert.equal(await p.locator('#message').textContent(), discoveryMessage);
       for (const node of ['A', 'B', 'C', 'D']) {
-        await p.locator(`[data-node="${node}"]`).focus();
+        const island = p.locator(`[data-node="${node}"]`);
+        assert.equal(await island.getAttribute('aria-pressed'), 'false');
+        await island.focus();
         await p.keyboard.press('Enter');
+        assert.equal(await p.locator(`[data-node="${node}"]`).getAttribute('aria-pressed'), 'true');
       }
       await p.screenshot({ path: 'test-results/historical-discovery.png', fullPage: true });
       await p.locator('#explain-discovery').click();

@@ -438,6 +438,8 @@ export function startGame() {
       }
       return;
     }
+    // Discovery and completed runs have no crossings to take; keep their guidance in place.
+    if (!['walking', 'stuck'].includes(run.phase)) return;
     if (motion.busy) {
       motion.enqueue(id);
       return;
