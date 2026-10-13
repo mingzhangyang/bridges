@@ -19,6 +19,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Diagnose Prettier differences (temporary)
+        run: |
+          npx prettier tests/smoke-bridges.mjs > /tmp/formatted-browser-tests
+          diff -u tests/smoke-bridges.mjs /tmp/formatted-browser-tests || true
       - run: npm run check
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
