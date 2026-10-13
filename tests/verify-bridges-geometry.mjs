@@ -80,16 +80,19 @@ test('Island names never sit on a bridge deck, another island or another name', 
         }
 });
 test('Every bridge lands on the quays of both its islands', () => {
-  for (const level of allLevels) {
-    const geo = geometry(level, false);
-    for (const curve of Object.values(geo.curves)) {
-      const [from, to] = curve.ends;
-      assert.ok(from.t > 0 && from.t < to.t && to.t < 1);
-      for (const [end, node] of [
-        [from, curve.a],
-        [to, curve.b],
-      ])
-        assert.ok(Math.abs(((end.x - node.x) / 66) ** 2 + ((end.y - node.y) / 42) ** 2 - 1) < 0.01);
+  for (const level of allLevels)
+    for (const portrait of [false, true]) {
+      const geo = geometry(level, portrait);
+      for (const curve of Object.values(geo.curves)) {
+        const [from, to] = curve.ends;
+        assert.ok(from.t > 0 && from.t < to.t && to.t < 1);
+        for (const [end, node] of [
+          [from, curve.a],
+          [to, curve.b],
+        ])
+          assert.ok(
+            Math.abs(((end.x - node.x) / 66) ** 2 + ((end.y - node.y) / 42) ** 2 - 1) < 0.01,
+          );
+      }
     }
-  }
 });

@@ -75,8 +75,10 @@ function streetAngles(nodeId, geo) {
   for (const curve of Object.values(geo.curves)) {
     const end = curve.canonical.indexOf(nodeId);
     if (end < 0) continue;
+    // How far along the curve, from this island's square, the quay is.
+    const reach = end ? 1 - curve.ends[1].t : curve.ends[0].t;
     for (let k = 0; k <= 12; k++) {
-      const t = (curve.ends[end].t * k) / 12,
+      const t = (reach * k) / 12,
         p = curve.point(end ? 1 - t : t),
         dx = (p.x - o.x) / 72,
         dy = (p.y - o.y) / 47;
