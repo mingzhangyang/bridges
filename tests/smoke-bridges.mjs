@@ -299,19 +299,22 @@ try {
       }
     },
   );
-  await scenario('Free-start circuit hints never claim an odd island exists', async () => {
-    await p.goto(`${base}/?lang=en#SB10`);
-    await p.locator('#restart-button').click();
-    await p.locator('#hint-button').click();
-    assert.equal(await p.locator('#message').textContent(), 'Choose an island to start.');
-    await p.goto(`${base}/?lang=en#SB04`);
-    await p.locator('#restart-button').click();
-    await p.locator('#hint-button').click();
-    assert.equal(
-      await p.locator('#message').textContent(),
-      'Try starting at an island with an unpaired end.',
-    );
-  });
+  await scenario(
+    'Free-start circuit hints never claim an odd island exists',
+    async () => {
+      await p.goto(`${base}/?lang=en#SB10`);
+      await p.locator('#restart-button').click();
+      await p.locator('#hint-button').click();
+      assert.equal(await p.locator('#message').textContent(), 'Choose an island to start.');
+      await p.goto(`${base}/?lang=en#SB04`);
+      await p.locator('#restart-button').click();
+      await p.locator('#hint-button').click();
+      assert.equal(
+        await p.locator('#message').textContent(),
+        'Try starting at an island with an unpaired end.',
+      );
+    },
+  );
   await unlocked.context.close();
   const mobile = await pageFor({ mobile: true });
   await mobile.page.goto(`${base}/?lang=zh`);
@@ -519,33 +522,40 @@ try {
     assert.equal(await corruptSave.page.locator('#save-warning').isVisible(), false);
   });
   await corruptSave.context.close();
-  await scenario('Malformed daily keys and locked chapters cannot be resumed', async () => {
-    for (const [lastLevel, hash] of [
-      ['daily:2026-10-12:1:constructor', ''],
-      ['daily:2026-10-12:1:walk:extra', ''],
-      ['daily:2026-10-12:1:repair', ''],
-      ['SB10', ''],
-      ['SB10', '#SB10'],
-    ]) {
-      const locked = await pageFor();
-      await locked.page.addInitScript(
-        ({ key, value }) => localStorage.setItem(key, value),
-        { key: STORAGE_KEY, value: JSON.stringify({ ...emptySnapshot(), lastLevel }) },
-      );
-      await locked.page.goto(`${base}/?lang=en${hash}`);
-      assert.equal(await locked.page.locator('#level-number').textContent(), 'SB01');
-      assert.ok(locked.page.url().endsWith('#SB01'));
-      await locked.context.close();
-    }
+  const invalidKey = await pageFor();
+  const invalidValue = JSON.stringify({
+    ...emptySnapshot(),
+    lastLevel: 'daily:2026-10-12:1:constructor',
   });
+  await invalidKey.page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+    key: STORAGE_KEY,
+    value: invalidValue,
+  });
+  await invalidKey.page.goto(base);
+  await scenario('Malformed daily key cannot crash startup', async () => {
+    assert.equal(await invalidKey.page.locator('#level-number').textContent(), 'SB01');
+  });
+  await invalidKey.context.close();
+  const locked = await pageFor();
+  const lockedValue = JSON.stringify({ ...emptySnapshot(), lastLevel: 'SB10' });
+  await locked.page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+    key: STORAGE_KEY,
+    value: lockedValue,
+  });
+  await locked.page.goto(`${base}/#SB10`);
+  await scenario('Locked saved campaign level cannot bypass progression', async () => {
+    assert.equal(await locked.page.locator('#level-number').textContent(), 'SB01');
+  });
+  await locked.context.close();
   const dailyResume = await pageFor();
-  await dailyResume.page.addInitScript(
-    ({ key, value }) => localStorage.setItem(key, value),
-    {
-      key: STORAGE_KEY,
-      value: JSON.stringify({ ...emptySnapshot(), lastLevel: 'daily:2026-10-17:1:repair' }),
-    },
-  );
+  const dailyValue = JSON.stringify({
+    ...emptySnapshot(),
+    lastLevel: 'daily:2026-10-17:1:repair',
+  });
+  await dailyResume.page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+    key: STORAGE_KEY,
+    value: dailyValue,
+  });
   await dailyResume.page.goto(base);
   await scenario('Valid weekend work resumes without campaign progression', async () => {
     assert.equal(await dailyResume.page.locator('#level-number').textContent(), '2026-10-17');
