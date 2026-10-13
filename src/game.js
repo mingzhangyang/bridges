@@ -112,7 +112,6 @@ export function startGame() {
     if (dailyMode() && snapshot.assistance[key]) run.assistance = true;
     if (run.phase === 'discovery') {
       view = 'graph';
-      counts = true;
     }
     save();
     render();
@@ -331,7 +330,6 @@ export function startGame() {
       motion.cancel();
       run = { ...run, phase: 'discovery' };
       view = 'graph';
-      counts = true;
       message = '';
       save();
       render();
