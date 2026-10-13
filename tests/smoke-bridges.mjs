@@ -232,6 +232,9 @@ try {
     'Historical discovery has a separate explanation and stamp, never a fake seven-bridge win',
     async () => {
       await p.locator('#begin-discovery').click();
+      assert.equal(await p.locator('#counts-button').getAttribute('aria-pressed'), 'false');
+      await p.reload();
+      assert.equal(await p.locator('#counts-button').getAttribute('aria-pressed'), 'false');
       for (const node of ['A', 'B', 'C', 'D']) {
         await p.locator(`[data-node="${node}"]`).focus();
         await p.keyboard.press('Enter');
