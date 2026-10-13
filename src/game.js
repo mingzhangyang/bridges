@@ -203,7 +203,7 @@ export function startGame() {
     $('start-fact').textContent =
       `${tr('from')} · ${level.fixedStart ?? run.startNode ?? tr('free')}`;
     $('end-fact').textContent =
-      `${tr('to')} · ${level.objective === 'return' ? (run.startNode ?? tr('from')) : (level.fixedEnd ?? tr('free'))}`;
+      `${tr('to')} · ${level.objective === 'return' ? (run.startNode ?? tr('free')) : (level.fixedEnd ?? tr('free'))}`;
     $('route-history').textContent = run.history.join(' → ') || '—';
     const defaultMessage =
       run.phase === 'planning'
@@ -818,13 +818,21 @@ export function startGame() {
           const filename = `seven-bridges-${recordKey.replaceAll(':', '-')}.png`;
           if (action === 'share') {
             const file = new File([blob], filename, { type: 'image/png' });
-            if (navigator.canShare?.({ files: [file] }))
+            if (!navigator.canShare?.({ files: [file] })) {
+              $('export-status').textContent = tr('exportFail');
+              return;
+            }
+            $('export-status').textContent = '';
+            button.textContent = tr('share');
+            button.disabled = false;
+            button.onclick = async (event) => {
+              event.stopPropagation();
               try {
                 await navigator.share({ files: [file], title: tr('title') });
               } catch {
                 $('export-status').textContent = tr('exportFail');
               }
-            else $('export-status').textContent = tr('exportFail');
+            };
           } else downloadBlob(blob, filename);
         } catch {
           if ($('export-status')) $('export-status').textContent = tr('exportFail');
