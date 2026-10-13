@@ -106,6 +106,30 @@ try {
   const { page, context } = await pageFor();
   await page.goto(`${base}/?lang=en`);
   await page.waitForSelector('[data-bridge]');
+  await scenario('Dialog naming and secondary text contrast are accessible', async () => {
+    const ratios = await page.evaluate(() => {
+      const css = getComputedStyle(document.documentElement);
+      const luminance = (hex) => {
+        const channels = hex
+          .trim()
+          .replace('#', '')
+          .match(/.{2}/g)
+          .map((part) => parseInt(part, 16) / 255)
+          .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      };
+      const foreground = luminance(css.getPropertyValue('--muted'));
+      return ['--paper', '--panel', '--soft'].map((background) => {
+        const value = luminance(css.getPropertyValue(background));
+        return (Math.max(foreground, value) + 0.05) / (Math.min(foreground, value) + 0.05);
+      });
+    });
+    assert.ok(ratios.every((ratio) => ratio >= 4.5), JSON.stringify(ratios));
+    await page.locator('#settings-button').click();
+    const title = await page.locator('#dialog-title').textContent();
+    assert.equal(await page.getByRole('dialog', { name: title }).isVisible(), true);
+    await page.locator('#dialog-close').click();
+  });
   await scenario(
     'Desktop first harbour, click route, undo, reload and completed postcard',
     async () => {
@@ -485,6 +509,21 @@ try {
     assert.equal(await invalidSave.page.locator('#progress-number').textContent(), '0 / 3');
   });
   await invalidSave.context.close();
+  const corruptSave = await pageFor();
+  await corruptSave.page.addInitScript((key) => localStorage.setItem(key, '{}'), STORAGE_KEY);
+  await corruptSave.page.goto(base);
+  await scenario('Malformed saved data can recover through normal gameplay', async () => {
+    await keyBridge(corruptSave.page, 'b1');
+    assert.equal(await corruptSave.page.locator('#progress-number').textContent(), '1 / 3');
+    const saved = await corruptSave.page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key)),
+      STORAGE_KEY,
+    );
+    assert.equal(saved.version, 1);
+    assert.deepEqual(saved.runs.SB01.walkedEdgeIds, ['b1']);
+    assert.equal(await corruptSave.page.locator('#save-warning').isVisible(), false);
+  });
+  await corruptSave.context.close();
   assert.deepEqual(errors, []);
   await writeFile(
     'test-results/browser-summary.json',

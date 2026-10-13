@@ -19,12 +19,14 @@ export function storageAdapter(getStorage = () => globalThis.localStorage) {
         const raw = getStorage().getItem(STORAGE_KEY);
         if (!raw) return emptySnapshot();
         const value = JSON.parse(raw);
-        if (value?.version !== 1) {
+        const version = value?.version;
+        // Only newer schema versions are incompatible; malformed data can be repaired on save.
+        if (typeof version === 'number' && version > 1) {
           incompatible = true;
           throw new Error('Unsupported save version');
         }
         if (
-          value.version !== 1 ||
+          version !== 1 ||
           !['runs', 'completions', 'discoveries', 'assistance', 'settings'].every(
             (k) => value[k] && typeof value[k] === 'object' && !Array.isArray(value[k]),
           )

@@ -57,6 +57,33 @@ test('storage failures are explicit and recoverable', () => {
   assert.equal(adapter.read().version, 1);
   assert.equal(adapter.failed, true);
 });
+test('malformed saves remain recoverable and can be replaced by a valid snapshot', () => {
+  const malformed = [
+    'null',
+    '{}',
+    '{"version":0}',
+    '{"version":"2"}',
+    '{"version":1}',
+    JSON.stringify({ ...emptySnapshot(), runs: [] }),
+  ];
+  for (const original of malformed) {
+    let raw = original;
+    const adapter = storageAdapter(() => ({
+      getItem: () => raw,
+      setItem: (_, content) => {
+        raw = content;
+      },
+    }));
+    assert.deepEqual(adapter.read(), emptySnapshot(), original);
+    assert.equal(adapter.failed, true, original);
+    const recovered = { ...emptySnapshot(), lastLevel: 'SB03' };
+    assert.equal(adapter.trySet(recovered), true, original);
+    assert.equal(adapter.failed, false, original);
+    assert.deepEqual(adapter.read(), recovered, original);
+    assert.equal(raw, JSON.stringify(recovered), original);
+  }
+});
+
 test('independent and assisted seals remain separate; daily resets cannot erase assistance', () => {
   const l = getLevel('SB01');
   let r = newRun(l);
@@ -94,17 +121,20 @@ test('sweep includes intermediate corridor samples and parallel hits remain dist
 });
 
 test('future-version snapshots are preserved rather than silently overwritten', () => {
-  let raw = JSON.stringify({ ...emptySnapshot(), version: 2 });
-  const original = raw;
-  const storage = storageAdapter(() => ({
-    getItem: () => raw,
-    setItem: (_, value) => {
-      raw = value;
-    },
-  }));
-  assert.equal(storage.read().version, 1);
-  assert.equal(storage.trySet(emptySnapshot()), false);
-  assert.equal(raw, original);
+  for (const future of [{ ...emptySnapshot(), version: 2 }, { version: 1.5 }, { version: 99 }]) {
+    let raw = JSON.stringify(future);
+    const original = raw;
+    const storage = storageAdapter(() => ({
+      getItem: () => raw,
+      setItem: (_, value) => {
+        raw = value;
+      },
+    }));
+    assert.equal(storage.read().version, 1);
+    assert.equal(storage.failed, true);
+    assert.equal(storage.trySet(emptySnapshot()), false);
+    assert.equal(raw, original);
+  }
 });
 
 test('invalid lastLevel recovers the navigation field without discarding valid records', () => {
