@@ -91,7 +91,7 @@ button.primary:hover {
   letter-spacing: 2px;
 }
 .brand-en {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 2px;
   margin-left: 5px;
@@ -99,10 +99,34 @@ button.primary:hover {
   color: var(--muted);
 }
 .brand-mark {
-  font-size: 42px;
-  line-height: 30px;
-  color: var(--accent);
-  transform: rotate(-10deg);
+  width: 44px;
+  height: 31px;
+  flex: none;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.brand-mark .brand-piers {
+  stroke-width: 1.7;
+}
+.brand-mark .brand-water {
+  stroke: var(--gold);
+  stroke-width: 1.7;
+}
+/* The English title already reads "Seven Bridges"; the subtitle only helps beside Chinese. */
+:lang(en) .brand-en {
+  display: none;
+}
+.icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 nav {
   display: flex;
@@ -116,6 +140,8 @@ nav button {
   font-size: 24px;
   width: 44px;
   padding: 0;
+  display: inline-grid;
+  place-items: center;
 }
 .intro {
   display: flex;
@@ -124,7 +150,7 @@ nav button {
   margin: 44px 0 34px;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 3px;
   color: var(--muted);
@@ -153,7 +179,12 @@ h1 {
 }
 .daily-link > span:first-child {
   grid-row: span 2;
-  font-size: 28px;
+  align-self: center;
+  color: var(--accent);
+}
+.daily-link .icon {
+  width: 26px;
+  height: 26px;
 }
 .daily-link small {
   font-family: monospace;
@@ -182,7 +213,7 @@ h1 {
   align-items: center;
   padding: 18px 24px;
   color: var(--map-label);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1.8px;
   z-index: 1;
 }
@@ -195,7 +226,7 @@ h1 {
 }
 .map-bottomline > span:nth-child(2) {
   letter-spacing: 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .stage {
   flex: 1;
@@ -412,6 +443,13 @@ h1 {
   stroke-linejoin: round;
   stroke-opacity: 0.85;
 }
+.portrait .land-name {
+  font-size: 22px;
+  stroke-width: 6px;
+}
+.portrait .node-letter {
+  font-size: 19px;
+}
 .degree rect {
   fill: #fff5d9;
   stroke: #c99f61;
@@ -429,6 +467,51 @@ h1 {
 .traveler {
   pointer-events: none;
 }
+.traveler-ring {
+  fill: #fff3d0;
+  fill-opacity: 0.35;
+  stroke: #d99d51;
+  stroke-width: 2.5;
+  animation: traveler-ring 1.6s ease-in-out infinite alternate;
+}
+.traveler-bob {
+  animation: traveler-bob 1.2s ease-in-out infinite alternate;
+}
+@keyframes traveler-ring {
+  from {
+    stroke-opacity: 0.35;
+  }
+  to {
+    stroke-opacity: 1;
+  }
+}
+@keyframes traveler-bob {
+  to {
+    transform: translateY(-2.5px);
+  }
+}
+.crossing-shadow {
+  fill: none;
+  stroke: #1f3a47;
+  stroke-width: 22;
+  opacity: 0.3;
+  pointer-events: none;
+}
+.wake {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.22;
+}
+.sails {
+  animation: sails 16s linear infinite;
+}
+@keyframes sails {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .graph-view .terrain,
 .graph-view .terrain-props,
 .graph-view .streets,
@@ -437,6 +520,7 @@ h1 {
   opacity: 0.08;
 }
 .graph-view .bridge-shadow,
+.graph-view .crossing-shadow,
 .graph-view .bridge-grain,
 .graph-view .abutments,
 .graph-view .lamps {
@@ -509,7 +593,7 @@ h1 {
   letter-spacing: 1px;
 }
 .progress span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .progress-dots {
@@ -531,7 +615,7 @@ h1 {
 .endpoints {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 12px;
   margin: 17px 0;
   color: var(--muted);
 }
@@ -541,7 +625,7 @@ h1 {
   margin-bottom: 16px;
 }
 .route-journal h3 {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 2px;
   color: var(--muted);
@@ -582,7 +666,7 @@ h1 {
   padding: 9px 12px;
 }
 .toolbar button > span:first-child {
-  font-size: 22px;
+  display: inline-grid;
   color: var(--accent);
 }
 .toolbar-spacer {
@@ -593,7 +677,7 @@ footer {
   justify-content: space-between;
   border-top: 1px solid var(--line);
   padding: 23px 0 30px;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   letter-spacing: 1px;
 }
@@ -632,7 +716,7 @@ footer a:hover {
   display: block;
   margin-top: 6px;
   color: var(--gold-text);
-  font-size: 10px;
+  font-size: 12px;
 }
 #complete-banner button {
   font-size: 12px;
@@ -704,7 +788,7 @@ dialog::backdrop {
 }
 .chapter-heading small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .level-grid {
   display: grid;
@@ -729,7 +813,7 @@ dialog::backdrop {
   margin-bottom: 6px;
 }
 .level-card small {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--gold-text);
 }
 .dialog-tabs {
@@ -843,8 +927,18 @@ dialog::backdrop {
   --water: #405760;
   --map-label: #eff8f4;
 }
-[data-theme='dark'] .map-panel {
-  filter: brightness(0.8) saturate(0.8);
+/* Dark theme: the harbour at dusk, drawn in its own colours rather than dimmed. */
+[data-theme='dark'] .city-scene:not(.atmosphere-4) .water-a {
+  stop-color: #4f6d72;
+}
+[data-theme='dark'] .city-scene:not(.atmosphere-4) .water-b {
+  stop-color: #22404e;
+}
+[data-theme='dark'] .city-scene .sky {
+  opacity: 0.35;
+}
+[data-theme='dark'] .city-scene .land {
+  filter: brightness(0.8) saturate(0.9);
 }
 [data-theme='dark'] #complete-banner {
   background: #283d43ed;
@@ -892,7 +986,8 @@ dialog::backdrop {
     letter-spacing: 1px;
   }
   .brand-mark {
-    font-size: 35px;
+    width: 34px;
+    height: 24px;
   }
   nav {
     gap: 2px;
@@ -911,12 +1006,12 @@ dialog::backdrop {
     margin-bottom: 8px;
   }
   .intro p:last-child {
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0;
     margin: 0;
   }
   .intro .eyebrow {
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 2px;
     margin-bottom: 10px;
   }
@@ -928,13 +1023,13 @@ dialog::backdrop {
     border: 0;
     padding: 0;
     min-width: 86px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .daily-link > span:first-child {
     display: none;
   }
   .daily-link small {
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0;
   }
   .journey-layout {
@@ -945,11 +1040,11 @@ dialog::backdrop {
   .map-topline,
   .map-bottomline {
     padding: 12px 16px;
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 1px;
   }
   .map-bottomline > span:nth-child(2) {
-    font-size: 9px;
+    font-size: 11px;
   }
   .city-scene {
     max-height: 70dvh;
@@ -965,7 +1060,7 @@ dialog::backdrop {
   .journal > .eyebrow {
     grid-column: 1;
     margin-bottom: 0;
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 1.5px;
   }
   .journal h2 {
@@ -976,7 +1071,7 @@ dialog::backdrop {
   .objective {
     grid-column: 1;
     margin: 0;
-    font-size: 10px;
+    font-size: 12px;
   }
   .progress {
     grid-column: 2;
@@ -993,12 +1088,12 @@ dialog::backdrop {
     font-size: 23px;
   }
   .progress span {
-    font-size: 9px;
+    font-size: 11px;
   }
   .endpoints {
     grid-column: 1 / span 2;
     margin: 8px 0;
-    font-size: 10px;
+    font-size: 12px;
   }
   .route-journal {
     display: none;
@@ -1006,7 +1101,7 @@ dialog::backdrop {
   .message {
     grid-column: 1 / span 2;
     min-height: 0;
-    font-size: 11px;
+    font-size: 12px;
     margin: 0;
     padding-bottom: 8px;
   }
@@ -1029,21 +1124,22 @@ dialog::backdrop {
     justify-content: space-around;
   }
   .toolbar button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 8px;
     gap: 4px;
     flex-direction: column;
     min-width: 58px;
   }
-  .toolbar button > span:first-child {
-    font-size: 23px;
+  .toolbar button > span:first-child .icon {
+    width: 24px;
+    height: 24px;
   }
   .toolbar-spacer {
     display: none;
   }
   footer {
     padding: 20px 0;
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 0;
   }
   footer > span:nth-child(2) {
@@ -1059,11 +1155,11 @@ dialog::backdrop {
     font-size: 16px;
   }
   #complete-banner small {
-    font-size: 9px;
+    font-size: 11px;
   }
   #complete-banner button {
     padding: 9px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .level-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -1113,37 +1209,53 @@ dialog::backdrop {
   }
 }
 
-.atmosphere-4 .land-name {
+.atmosphere-4 .land-name,
+[data-theme='dark'] .city-scene .land-name {
   fill: #e6efe9;
   stroke: #1d354a;
 }
-/* Harbour of lights: dusk-dark houses, lit windows and lamplight on every square. */
-.atmosphere-4 .wall {
+/* Harbour of lights (and every harbour in the dark theme): dusk-dark houses, lit windows,
+   beacons and lamplight on every square. */
+.atmosphere-4 .wall,
+[data-theme='dark'] .city-scene .wall {
   fill: #a9a592;
 }
-.atmosphere-4 .wall-side {
+.atmosphere-4 .wall-side,
+[data-theme='dark'] .city-scene .wall-side {
   fill: #6f6b5d;
 }
-.atmosphere-4 .window {
+.atmosphere-4 .window,
+[data-theme='dark'] .city-scene .window {
   fill: #ffd77d;
   filter: drop-shadow(0 0 3px #ffc65c);
 }
-.atmosphere-4 .door {
+.atmosphere-4 .door,
+[data-theme='dark'] .city-scene .door {
   fill: #e8a955;
 }
-.atmosphere-4 .plaza-glow {
+.atmosphere-4 .plaza-glow,
+[data-theme='dark'] .city-scene .plaza-glow {
   opacity: 1;
 }
-.atmosphere-4 .street {
+.atmosphere-4 .street,
+[data-theme='dark'] .city-scene .street {
   stroke: #c9c2a4;
 }
-.atmosphere-4 .street.walked {
+.atmosphere-4 .street.walked,
+[data-theme='dark'] .city-scene .street.walked {
   stroke: #ffd48a;
 }
-.atmosphere-4 .tree {
+.atmosphere-4 .tree,
+[data-theme='dark'] .city-scene .tree {
   fill: #35525a;
 }
-.graph-view .plaza-glow {
+.atmosphere-4 .beacon,
+[data-theme='dark'] .city-scene .beacon {
+  fill: #ffd36b;
+  filter: drop-shadow(0 0 6px #ffc65c);
+}
+.graph-view .plaza-glow,
+[data-theme='dark'] .graph-view .plaza-glow {
   opacity: 0;
 }
 .atmosphere-4 .node-letter {
@@ -1185,7 +1297,7 @@ dialog::backdrop {
   }
   #mobile-level-title {
     display: block;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0;
     max-width: 70%;
     line-height: 1.5;
@@ -1195,6 +1307,15 @@ dialog::backdrop {
   }
 }
 @media (max-width: 380px) {
+  /* The bridge mark stands in for the name on the narrowest phones; the link keeps its name. */
+  #brand-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   h1 {
     font-size: 24px;
     line-height: 1.35;
@@ -1204,11 +1325,11 @@ dialog::backdrop {
     letter-spacing: 0.5px;
   }
   .intro .eyebrow {
-    font-size: 7px;
+    font-size: 9px;
     letter-spacing: 1.5px;
   }
   .intro p:last-child {
-    font-size: 10px;
+    font-size: 11px;
   }
   .daily-link {
     min-width: 79px;
