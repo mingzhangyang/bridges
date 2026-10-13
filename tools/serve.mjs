@@ -31,7 +31,7 @@ export function serve({ port = 4173, root = '.' } = {}) {
   });
   return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)));
 }
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (process.argv[1] === import.meta.filename) {
   const port = Number(process.env.PORT ?? 4173);
   await serve({ port, root: process.env.SERVE_ROOT ?? '.' });
   console.log(`Seven Bridges: http://127.0.0.1:${port}`);
