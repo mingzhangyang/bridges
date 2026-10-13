@@ -19,10 +19,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Diagnose formatting (temporary)
-        run: |
-          npx prettier tests/smoke-bridges.mjs > /tmp/smoke-formatted
-          diff -u tests/smoke-bridges.mjs /tmp/smoke-formatted || true
       - run: npm run check
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser

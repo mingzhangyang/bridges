@@ -299,22 +299,19 @@ try {
       }
     },
   );
-  await scenario(
-    'Free-start circuit hints never claim an odd island exists',
-    async () => {
-      await p.goto(`${base}/?lang=en#SB10`);
-      await p.locator('#restart-button').click();
-      await p.locator('#hint-button').click();
-      assert.equal(await p.locator('#message').textContent(), 'Choose an island to start.');
-      await p.goto(`${base}/?lang=en#SB04`);
-      await p.locator('#restart-button').click();
-      await p.locator('#hint-button').click();
-      assert.equal(
-        await p.locator('#message').textContent(),
-        'Try starting at an island with an unpaired end.',
-      );
-    },
-  );
+  await scenario('Free-start circuit hints never claim an odd island exists', async () => {
+    await p.goto(`${base}/?lang=en#SB10`);
+    await p.locator('#restart-button').click();
+    await p.locator('#hint-button').click();
+    assert.equal(await p.locator('#message').textContent(), 'Choose an island to start.');
+    await p.goto(`${base}/?lang=en#SB04`);
+    await p.locator('#restart-button').click();
+    await p.locator('#hint-button').click();
+    assert.equal(
+      await p.locator('#message').textContent(),
+      'Try starting at an island with an unpaired end.',
+    );
+  });
   await unlocked.context.close();
   const mobile = await pageFor({ mobile: true });
   await mobile.page.goto(`${base}/?lang=zh`);
