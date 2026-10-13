@@ -161,6 +161,26 @@ try {
       await page.locator('#dialog-close').click();
     },
   );
+  await scenario('Postcard share uses the current route option on the first click', async () => {
+    await page.evaluate(() => {
+      window.__shares = [];
+      navigator.canShare = () => true;
+      navigator.share = async ({ files }) => {
+        window.__shares.push({ active: navigator.userActivation.isActive, size: files[0].size });
+      };
+    });
+    await page.locator('#postcard-button').click();
+    const share = page.locator('[data-action="share"]');
+    await share.click();
+    await page.locator('#include-route').check();
+    await share.click();
+    const shares = await page.evaluate(() => window.__shares);
+    assert.equal(shares.length, 2);
+    assert.ok(shares.every((s) => s.active));
+    assert.notEqual(shares[0].size, shares[1].size);
+    assert.equal(await page.locator('#export-status').textContent(), '');
+    await page.locator('#dialog-close').click();
+  });
   await scenario('Both themes meet text contrast for map, route and completion UI', async () => {
     for (const theme of ['light', 'dark']) {
       await page.locator('#settings-button').click();

@@ -793,54 +793,75 @@ export function startGame() {
       tr('postcard'),
       `<p class="help-copy">${escape(nm(l.title))}</p><p class="dialog-note">${escape(recordKey.startsWith('daily:') ? recordKey.split(':')[1] : l.id)} · ${tr(bucket[recordKey]?.independent ? 'independent' : 'assisted')}</p><label class="postcard-options"><input id="include-route" type="checkbox">${tr('routeOpt')}</label><div class="export-buttons"><button class="primary" data-action="download">${tr('download')}</button><button data-action="share">${tr('share')}</button></div><p id="export-status" class="dialog-note" role="status"></p>`,
       async (action, button) => {
-        if (!['download', 'share'].includes(action)) return;
+        if (action === 'share') {
+          // Call navigator.share synchronously from the click so the user gesture still counts.
+          if (!ready) return;
+          if (!navigator.canShare?.({ files: [ready] })) {
+            $('export-status').textContent = tr('exportFail');
+            return;
+          }
+          $('export-status').textContent = '';
+          try {
+            await navigator.share({ files: [ready], title: tr('title') });
+          } catch {
+            $('export-status').textContent = tr('exportFail');
+          }
+          return;
+        }
+        if (action !== 'download') return;
         button.disabled = true;
-        const generation = sceneGeneration,
-          includeRoute = $('include-route').checked;
         try {
-          const g = l.kind === 'repair' ? applyEdits(l, r.edits).graph : l,
-            saved = {
-              ...newRun(l),
-              startNode: r.start,
-              currentNode: r.start,
-              walkedEdgeIds: includeRoute ? r.edges : [],
-              finalEditSet: r.edits,
-              draftEdits: r.edits,
-            };
-          const holder = document.createElement('div');
-          holder.innerHTML = citySVG(l, g, saved, geometry(l, false), { lang: settings.lang });
-          const blob = await postcardBlob(holder.querySelector('svg'), {
-            title: `${tr('title')} · ${nm(l.title)}`,
-            subtitle: recordKey.startsWith('daily:') ? recordKey.split(':')[1] : l.id,
-            includeRoute,
-          });
-          if (generation !== sceneGeneration) return;
-          const filename = `seven-bridges-${recordKey.replaceAll(':', '-')}.png`;
-          if (action === 'share') {
-            const file = new File([blob], filename, { type: 'image/png' });
-            if (!navigator.canShare?.({ files: [file] })) {
-              $('export-status').textContent = tr('exportFail');
-              return;
-            }
-            $('export-status').textContent = '';
-            button.textContent = tr('share');
-            button.disabled = false;
-            button.onclick = async (event) => {
-              event.stopPropagation();
-              try {
-                await navigator.share({ files: [file], title: tr('title') });
-              } catch {
-                $('export-status').textContent = tr('exportFail');
-              }
-            };
-          } else downloadBlob(blob, filename);
+          const file = await pending;
+          if (generation === sceneGeneration && button.isConnected) downloadBlob(file, filename);
         } catch {
-          if ($('export-status')) $('export-status').textContent = tr('exportFail');
+          if (button.isConnected) $('export-status').textContent = tr('exportFail');
         } finally {
           button.disabled = false;
         }
       },
     );
+    const generation = sceneGeneration,
+      filename = `seven-bridges-${recordKey.replaceAll(':', '-')}.png`,
+      shareButton = $('dialog-content').querySelector('[data-action="share"]');
+    let pending = null,
+      ready = null;
+    async function drawPostcard(includeRoute) {
+      const g = l.kind === 'repair' ? applyEdits(l, r.edits).graph : l,
+        saved = {
+          ...newRun(l),
+          startNode: r.start,
+          currentNode: r.start,
+          walkedEdgeIds: includeRoute ? r.edges : [],
+          finalEditSet: r.edits,
+          draftEdits: r.edits,
+        };
+      const holder = document.createElement('div');
+      holder.innerHTML = citySVG(l, g, saved, geometry(l, false), { lang: settings.lang });
+      const blob = await postcardBlob(holder.querySelector('svg'), {
+        title: `${tr('title')} · ${nm(l.title)}`,
+        subtitle: recordKey.startsWith('daily:') ? recordKey.split(':')[1] : l.id,
+        includeRoute,
+      });
+      return new File([blob], filename, { type: 'image/png' });
+    }
+    function prepare() {
+      ready = null;
+      shareButton.disabled = true;
+      const job = (pending = drawPostcard($('include-route').checked));
+      job.then(
+        (file) => {
+          if (job !== pending || generation !== sceneGeneration || !shareButton.isConnected) return;
+          ready = file;
+          shareButton.disabled = false;
+        },
+        () => {
+          if (job === pending && shareButton.isConnected)
+            $('export-status').textContent = tr('exportFail');
+        },
+      );
+    }
+    $('include-route').onchange = prepare;
+    prepare();
   }
   document.addEventListener('visibilitychange', () => {
     motion.cancel();
