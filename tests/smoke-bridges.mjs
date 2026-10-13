@@ -106,7 +106,7 @@ async function assertTextContrast(page, pairs) {
   const readings = await page.evaluate((checks) => {
     const luminance = (color) => {
       const rgb = color
-        .match(/[\\d.]+/g)
+        .match(/[0-9.]+/g)
         .slice(0, 3)
         .map((part) => Number(part) / 255)
         .map((value) =>
