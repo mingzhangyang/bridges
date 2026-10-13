@@ -15,6 +15,8 @@ import { degrees } from './model/graph.js';
 import { storageAdapter, recordCompletion } from './storage.js';
 import {
   resolveSaveKey,
+  resolveSavedSelection,
+  levelUnlocked as isLevelUnlocked,
   sanitizeProgress,
   chapterUnlocked as isChapterUnlocked,
 } from './services/progress.js';
@@ -77,6 +79,9 @@ export function startGame() {
     return graphFor(level, run);
   }
   const chapterUnlocked = (id) => isChapterUnlocked(snapshot, id);
+  const levelUnlocked = (target) => isLevelUnlocked(snapshot, target);
+  const canSelect = (selection) =>
+    !!selection && (!!selection.entry || levelUnlocked(selection.level));
   function markAssistance() {
     run = { ...run, assistance: true };
     if (dailyMode()) snapshot.assistance[key] = true;
@@ -577,7 +582,9 @@ export function startGame() {
     if (!run.currentNode) {
       markAssistance();
       counts = true;
-      message = tr('hintStart');
+      message = Object.values(degrees(graph())).some((degree) => degree % 2)
+        ? tr('hintStart')
+        : tr('start');
       render();
       return;
     }
@@ -656,7 +663,7 @@ export function startGame() {
             (ch) =>
               `<section class="chapter"><div class="chapter-heading"><span>0${ch.id} · ${settings.lang === 'zh' ? ch.zh : ch.en}</span><small>${chapterUnlocked(ch.id) ? nm(ch.subtitle) : tr('chapterLocked')}</small></div><div class="level-grid">${levels
                 .filter((l) => l.chapter === ch.id)
-                .map((l) => levelCard(l, !chapterUnlocked(ch.id)))
+                .map((l) => levelCard(l, !levelUnlocked(l)))
                 .join('')}</div></section>`,
           )
           .join('');
@@ -682,7 +689,7 @@ export function startGame() {
       if (kind === 'tab') openAtlas(id);
       if (kind === 'level') {
         const l = getLevel(id);
-        if (l && (l.id.startsWith('EC') || chapterUnlocked(l.chapter))) {
+        if (levelUnlocked(l)) {
           closeDialog();
           select(l);
         }
@@ -851,29 +858,30 @@ export function startGame() {
   window.addEventListener('hashchange', navigateHash);
   function navigateHash() {
     const hash = location.hash.slice(1);
-    if (hash.startsWith('daily/')) {
-      const [, date, type] = hash.split('/'),
-        entry = manifest.find((e) => e.date === date);
-      if (entry && ['walk', 'repair'].includes(type) && entry[type]) {
-        select(getLevel(entry[type]), frozenKey(entry, type), entry);
+    const dailyParts = hash.split('/');
+    if (
+      dailyParts.length === 3 &&
+      dailyParts[0] === 'daily' &&
+      ['walk', 'repair'].includes(dailyParts[2])
+    ) {
+      const entry = manifest.find((e) => e.date === dailyParts[1]);
+      const requested = entry && resolveSavedSelection(frozenKey(entry, dailyParts[2]));
+      if (canSelect(requested)) {
+        select(requested.level, requested.key, requested.entry);
         return;
       }
     }
-    const l = getLevel(hash);
-    if (l && (l.id.startsWith('EC') || chapterUnlocked(l.chapter))) {
-      select(l);
+    const requested = resolveSavedSelection(hash);
+    if (canSelect(requested)) {
+      select(requested.level, requested.key, requested.entry);
       return;
     }
-    const last = snapshot.lastLevel;
-    if (last?.startsWith('daily:')) {
-      const parts = last.split(':'),
-        entry = manifest.find((e) => e.date === parts[1] && String(e.revision) === parts[2]);
-      if (entry && entry[parts[3]]) {
-        select(getLevel(entry[parts[3]]), last, entry);
-        return;
-      }
+    const fallback = resolveSavedSelection(snapshot.lastLevel);
+    if (canSelect(fallback)) {
+      select(fallback.level, fallback.key, fallback.entry);
+      return;
     }
-    select(getLevel(last) ?? levels[0]);
+    select(levels[0]);
   }
   navigateHash();
 }

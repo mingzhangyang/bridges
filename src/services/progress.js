@@ -3,14 +3,20 @@ import { manifest } from '../content/daily-manifest.js';
 import { newRun, graphFor, move } from '../model/commands.js';
 import { discoveryComplete } from '../model/rules.js';
 import { applyEdits } from '../model/repair.js';
-export function resolveSaveKey(key) {
+export function resolveSavedSelection(key) {
   if (typeof key !== 'string') return null;
-  if (!key.startsWith('daily:')) return getLevel(key);
-  const parts = key.split(':'),
-    entry = manifest.find((e) => e.date === parts[1] && String(e.revision) === parts[2]);
-  return parts.length === 4 && entry && ['walk', 'repair'].includes(parts[3])
-    ? getLevel(entry[parts[3]])
-    : null;
+  if (!key.startsWith('daily:')) {
+    const level = getLevel(key);
+    return level ? { level, key, entry: null } : null;
+  }
+  const parts = key.split(':');
+  if (parts.length !== 4 || !['walk', 'repair'].includes(parts[3])) return null;
+  const entry = manifest.find((e) => e.date === parts[1] && String(e.revision) === parts[2]);
+  const level = entry?.[parts[3]] ? getLevel(entry[parts[3]]) : null;
+  return level ? { level, key, entry } : null;
+}
+export function resolveSaveKey(key) {
+  return resolveSavedSelection(key)?.level ?? null;
 }
 function validRecord(level, record, assisted) {
   try {
@@ -78,4 +84,7 @@ export function chapterUnlocked(snapshot, id) {
           snapshot.discoveries[level.id]?.assisted),
     ).length >= 4
   );
+}
+export function levelUnlocked(snapshot, level) {
+  return !!level && (level.id.startsWith('EC') || chapterUnlocked(snapshot, level.chapter));
 }
