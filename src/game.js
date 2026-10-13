@@ -9,7 +9,7 @@ import {
   confirmBlueprint,
   restoreRun,
 } from './model/commands.js';
-import { applyEdits, repairSolution } from './model/repair.js';
+import { applyEdits, draftCost, repairSolution } from './model/repair.js';
 import {
   actionableBridges,
   bridgeAction,
@@ -19,7 +19,7 @@ import {
   visibleEdges,
 } from './model/interaction.js';
 import { degrees } from './model/graph.js';
-import { storageAdapter, recordCompletion } from './storage.js';
+import { storageAdapter, recordCompletion, mergeSnapshots, STORAGE_KEY } from './storage.js';
 import {
   resolveSaveKey,
   resolveSavedSelection,
@@ -29,23 +29,19 @@ import {
   chapterUnlocked as isChapterUnlocked,
 } from './services/progress.js';
 import { initialSettings } from './services/settings.js';
-import { dailyEntry, dailyHash, dailyKey } from './services/daily.js';
+import { dailyEntry, dailyHash } from './services/daily.js';
 import { hint } from './services/hints.js';
 import { postcardBlob, downloadBlob } from './services/export.js';
 import { geometry } from './render/geometry.js';
 import { citySVG } from './render/city.js';
 import { bridgeLabel, bridgeName } from './render/labels.js';
+import { escape } from './render/escape.js';
 import { motionController } from './render/motion.js';
 import { attachPointer } from './input/pointer.js';
 import { attachKeyboard } from './input/keyboard.js';
 import { audioService } from './audio.js';
 import { t, name } from './i18n.js';
 const $ = (id) => document.getElementById(id);
-const escape = (s) =>
-  String(s).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-  );
 export function startGame() {
   const store = storageAdapter(),
     sound = audioService();
@@ -70,7 +66,6 @@ export function startGame() {
   const motion = motionController((next) => {
     if (next && !document.hidden) submit(next);
   });
-  const frozenKey = (entry, type) => dailyKey(entry, type);
   const resolveKey = resolveSaveKey;
   const objectiveText = () =>
     tr(level.kind === 'discovery' ? 'discover' : level.fixedEnd ? 'fixed' : level.objective);
@@ -95,11 +90,13 @@ export function startGame() {
     if (dailyMode()) snapshot.assistance[key] = true;
     save();
   }
+  // Records a finished run (and saves). Returns false when there is nothing to record.
   function complete() {
-    if (run.phase !== 'complete') return;
+    if (run.phase !== 'complete') return false;
     const cost = level.kind === 'repair' ? applyEdits(level, run.finalEditSet).cost : 0;
     snapshot = recordCompletion(snapshot, key, level, run, cost);
     save();
+    return true;
   }
   function select(l, k = l.id, entry = null) {
     if (run) save();
@@ -114,16 +111,14 @@ export function startGame() {
     highlight = [];
     hintResult = null;
     message = '';
-    run =
-      restoreRun(level, snapshot.runs[key]) ??
-      newRun(level, !!snapshot.assistance[key] && k.startsWith('daily:'));
+    run = restoreRun(level, snapshot.runs[key]) ?? newRun(level);
     if (dailyMode() && snapshot.assistance[key]) run.assistance = true;
     if (run.phase === 'discovery') {
       view = 'graph';
     }
-    save();
+    // Record a restored finished run before drawing, so the banner reflects stored seals.
+    if (!complete()) save();
     render();
-    complete();
     const hash = daily ? dailyHash(daily, key.endsWith('repair') ? 'repair' : 'walk') : level.id;
     history.replaceState(null, '', `#${hash}`);
   }
@@ -187,7 +182,7 @@ export function startGame() {
       chapters[level.chapter - 1]?.zh,
       chapters[level.chapter - 1]?.en,
     ]);
-    $('view-label').textContent = view === 'city' ? 'CITY ATLAS' : 'RELATION GRAPH';
+    renderLens();
     $('level-number').textContent = daily ? daily.date : level.id;
     $('mobile-level-title').textContent = `${level.id} · ${nm(level.title)}`;
     $('stage-note').textContent = objectiveText();
@@ -231,11 +226,9 @@ export function startGame() {
     $('undo-button').disabled =
       run.phase === 'planning'
         ? !run.editHistory.length
-        : run.phase === 'discovery' || !run.walkedEdgeIds.length;
-    $('lens-button').querySelector('span:last-child').textContent = tr(
-      view === 'city' ? 'lens' : 'city',
-    );
-    $('lens-button').setAttribute('aria-pressed', String(view === 'graph'));
+        : run.phase === 'discovery' ||
+          (level.kind === 'discovery' && run.phase === 'complete') ||
+          !run.walkedEdgeIds.length;
     $('hint-button').querySelector('span:last-child').textContent = tr('hint');
     $('hint-button').disabled = ['planning', 'complete', 'discovery'].includes(run.phase);
     $('restart-button').querySelector('span:last-child').textContent = tr('restart');
@@ -249,6 +242,13 @@ export function startGame() {
       $('retry-save').textContent = tr('retry');
     }
   }
+  function renderLens() {
+    $('view-label').textContent = view === 'city' ? 'CITY ATLAS' : 'RELATION GRAPH';
+    $('lens-button').querySelector('span:last-child').textContent = tr(
+      view === 'city' ? 'lens' : 'city',
+    );
+    $('lens-button').setAttribute('aria-pressed', String(view === 'graph'));
+  }
   function renderEngineering() {
     const host = $('engineering');
     host.hidden = level.kind !== 'repair';
@@ -257,10 +257,7 @@ export function startGame() {
       return;
     }
     if (run.phase === 'planning') {
-      const cost = run.draftEdits.reduce(
-        (n, id) => n + (level.candidateEdits.find((e) => e.id === id)?.cost ?? 1),
-        0,
-      );
+      const cost = draftCost(level, run.draftEdits);
       host.innerHTML = `<small>${tr('budget')} · ${cost} / ${level.budget}</small><p class="dialog-note">${tr('serviceAreas')} · ${level.protectedEdges.length ? `${tr('protectedCount')}: ${level.protectedEdges.length}` : ''}</p><div class="works-list">${level.candidateEdits
         .filter((edit) => !(edit.kind === 'remove' && isProtected(level, edit.edgeId)))
         .map(
@@ -313,11 +310,7 @@ export function startGame() {
     const proposed = run.draftEdits.includes(id)
       ? run.draftEdits.filter((e) => e !== id)
       : [...run.draftEdits, id];
-    const cost = proposed.reduce(
-      (n, e) => n + (level.candidateEdits.find((c) => c.id === e)?.cost ?? 1),
-      0,
-    );
-    if (cost > level.budget) {
+    if (draftCost(level, proposed) > level.budget) {
       message = tr('overBudget');
       render();
       return;
@@ -377,12 +370,13 @@ export function startGame() {
     if (hintResult.kind === 'next') text = tr('hintNext') + (hintResult.edge ?? '—');
     if (hintResult.kind === 'start') text = tr('hintStart');
     if (hintResult.kind === 'rewind') text = tr('hintRewind') + hintResult.node;
-    host.innerHTML = `<div class="hint-card">${escape(text)}${hintResult.kind === 'rewind' ? `<button id="rewind-hint">${tr('rewind')} · ${hintResult.steps}</button>` : ''}</div>`;
+    host.innerHTML = `<div class="hint-card">${escape(text)}${hintResult.steps ? `<button id="rewind-hint">${tr('rewind')} · ${hintResult.steps}</button>` : ''}</div>`;
     if ($('rewind-hint'))
       $('rewind-hint').onclick = () => {
         motion.cancel();
         cancelPointer();
         while (run.walkedEdgeIds.length > hintResult.index) run = undo(run);
+        run = { ...run, hintTier: 0 };
         hintResult = null;
         highlight = [];
         message = '';
@@ -394,13 +388,12 @@ export function startGame() {
     const banner = $('complete-banner'),
       host = $('journal-actions');
     banner.hidden = run.phase !== 'complete';
-    host.innerHTML = '';
-    if (run.walkedEdgeIds.length > 1) {
-      host.innerHTML = `<button id="replay-button">${tr('replay')}</button>`;
-      $('replay-button').onclick = openReplay;
-    }
+    const replay =
+      run.walkedEdgeIds.length > 1 ? `<button id="replay-button">${tr('replay')}</button>` : '';
     if (banner.hidden) {
       banner.innerHTML = '';
+      host.innerHTML = replay;
+      if (replay) $('replay-button').onclick = openReplay;
       return;
     }
     const bucket = level.kind === 'discovery' ? snapshot.discoveries : snapshot.completions;
@@ -430,7 +423,7 @@ export function startGame() {
       if (next && chapterUnlocked(next.chapter)) select(next);
       else openAtlas();
     };
-    host.innerHTML += `<button id="postcard-button">${tr('postcard')} ↗</button>${bucket[key]?.independent && bucket[key]?.assisted ? `<small>${tr('independent')} ✓ · ${tr('assisted')} ✓</small>` : ''}`;
+    host.innerHTML = `${replay}<button id="postcard-button">${tr('postcard')} ↗</button>${bucket[key]?.independent && bucket[key]?.assisted ? `<small>${tr('independent')} ✓ · ${tr('assisted')} ✓</small>` : ''}`;
     if ($('replay-button')) $('replay-button').onclick = openReplay;
     $('postcard-button').onclick = () => openPostcard();
   }
@@ -459,12 +452,12 @@ export function startGame() {
       $('message').textContent = message;
       return;
     }
-    run = result.run;
+    // Hints escalate while the player is stuck; any progress starts them over.
+    run = { ...result.run, hintTier: 0 };
     message = '';
     highlight = [];
     hintResult = null;
-    save();
-    complete();
+    if (!complete()) save();
     render();
     if (run.phase === 'complete' && document.activeElement?.closest('[data-bridge]'))
       $('next-level')?.focus({ preventScroll: true });
@@ -519,6 +512,7 @@ export function startGame() {
         run,
         canSelectNode: (id) => !!nodeAction(level, run, id),
         walkable: (id) => bridgeAction(level, g, run, id) === 'walk',
+        actionable: (id) => !!bridgeAction(level, g, run, id),
         locked: motion.busy || run.phase === 'discovery' || $('dialog').open,
       };
     },
@@ -537,7 +531,7 @@ export function startGame() {
           draftEdits: run.editHistory.at(-1),
           editHistory: run.editHistory.slice(0, -1),
         };
-    } else run = undo(run);
+    } else run = { ...undo(run), hintTier: 0 };
     hintResult = null;
     highlight = [];
     message = '';
@@ -564,11 +558,7 @@ export function startGame() {
   $('lens-button').onclick = () => {
     cancelPointer();
     view = view === 'city' ? 'graph' : 'city';
-    $('lens-button').querySelector('span:last-child').textContent = tr(
-      view === 'city' ? 'lens' : 'city',
-    );
-    $('lens-button').setAttribute('aria-pressed', String(view === 'graph'));
-    $('view-label').textContent = view === 'city' ? 'CITY ATLAS' : 'RELATION GRAPH';
+    renderLens();
     motion.morph($('stage'), view);
   };
   $('hint-button').onclick = () => {
@@ -708,10 +698,11 @@ export function startGame() {
       tr('daily'),
       `<p class="dialog-note">${entry.date} · ${tr('dailyDate')}</p><button class="primary" data-action="walk">${tr('daily')} →</button>${entry.repair ? ` <button data-action="repair">${tr('weekend')} →</button>` : ''}`,
       (type) => {
-        const l = getLevel(entry[type]);
-        if (l) {
+        // Resume the revision already started today; otherwise today's newest revision.
+        const chosen = resolveDailyLink(`daily/${entry.date}/${type}`, snapshot);
+        if (chosen) {
           closeDialog();
-          select(l, frozenKey(entry, type), entry);
+          select(chosen.level, chosen.key, chosen.entry);
         }
       },
     );
@@ -733,6 +724,7 @@ export function startGame() {
         if (run.runId !== captured.runId) return;
         const index = Number($('replay-slider').value);
         while (run.walkedEdgeIds.length > index) run = undo(run);
+        run = { ...run, hintTier: 0 };
         message = '';
         hintResult = null;
         highlight = [];
@@ -789,11 +781,15 @@ export function startGame() {
   function openPostcard(recordKey = key) {
     const l = resolveKey(recordKey),
       bucket = l.kind === 'discovery' ? snapshot.discoveries : snapshot.completions,
-      r = bucket[recordKey]?.independent ?? bucket[recordKey]?.assisted;
+      // The postcard shows the most recent route, whichever seal it earned.
+      [category, r] =
+        Object.entries(bucket[recordKey] ?? {})
+          .filter(([c]) => ['independent', 'assisted'].includes(c))
+          .sort(([, a], [, b]) => String(b.at).localeCompare(String(a.at)))[0] ?? [];
     if (!r) return;
     showDialog(
       tr('postcard'),
-      `<p class="help-copy">${escape(nm(l.title))}</p><p class="dialog-note">${escape(recordKey.startsWith('daily:') ? recordKey.split(':')[1] : l.id)} · ${tr(bucket[recordKey]?.independent ? 'independent' : 'assisted')}</p><label class="postcard-options"><input id="include-route" type="checkbox">${tr('routeOpt')}</label><div class="export-buttons"><button class="primary" data-action="download">${tr('download')}</button><button data-action="share">${tr('share')}</button></div><p id="export-status" class="dialog-note" role="status"></p>`,
+      `<p class="help-copy">${escape(nm(l.title))}</p><p class="dialog-note">${escape(recordKey.startsWith('daily:') ? recordKey.split(':')[1] : l.id)} · ${tr(category)}</p><label class="postcard-options"><input id="include-route" type="checkbox">${tr('routeOpt')}</label><div class="export-buttons"><button class="primary" data-action="download">${tr('download')}</button><button data-action="share">${tr('share')}</button></div><p id="export-status" class="dialog-note" role="status"></p>`,
       async (action, button) => {
         if (action === 'share') {
           // Call navigator.share synchronously from the click so the user gesture still counts.
@@ -846,7 +842,6 @@ export function startGame() {
       const blob = await postcardBlob(holder.querySelector('svg'), {
         title: `${tr('title')} · ${nm(l.title)}`,
         subtitle: recordKey.startsWith('daily:') ? recordKey.split(':')[1] : l.id,
-        includeRoute,
       });
       return new File([blob], filename, { type: 'image/png' });
     }
@@ -869,6 +864,12 @@ export function startGame() {
     $('include-route').onchange = prepare;
     prepare();
   }
+  // Another tab saved: merge its records so neither tab erases the other's progress.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY || e.newValue === null) return;
+    snapshot = mergeSnapshots(snapshot, sanitizeProgress(store.read()), key);
+    render();
+  });
   document.addEventListener('visibilitychange', () => {
     motion.cancel();
     cancelPointer();

@@ -1,5 +1,5 @@
 import { validateGraph } from '../model/graph.js';
-const nodeNames = {
+export const nodeNames = {
   A: ['灯塔岛', 'Lighthouse'],
   B: ['北岸', 'North quay'],
   C: ['南岸', 'South quay'],

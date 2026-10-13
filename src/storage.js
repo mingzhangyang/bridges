@@ -58,10 +58,27 @@ export function storageAdapter(getStorage = () => globalThis.localStorage) {
     },
   };
 }
+// Discovery islands are a set; routes and edits are ordered.
 const sameWitness = (a, b) =>
-  ['start', 'edges', 'edits', 'discoveryNodes'].every(
-    (k) => JSON.stringify(a[k]) === JSON.stringify(b[k]),
-  );
+  ['start', 'edges', 'edits'].every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k])) &&
+  JSON.stringify([...(a.discoveryNodes ?? [])].sort()) ===
+    JSON.stringify([...(b.discoveryNodes ?? [])].sort());
+// Another tab saved: adopt its records without dropping ours, and keep this tab's open run.
+export function mergeSnapshots(ours, theirs, openKey) {
+  const records = (bucket) => {
+    const merged = { ...theirs[bucket] };
+    for (const [key, record] of Object.entries(ours[bucket]))
+      merged[key] = { ...record, ...merged[key] };
+    return merged;
+  };
+  return {
+    ...ours,
+    completions: records('completions'),
+    discoveries: records('discoveries'),
+    assistance: { ...ours.assistance, ...theirs.assistance },
+    runs: { ...ours.runs, ...theirs.runs, ...(openKey ? { [openKey]: ours.runs[openKey] } : {}) },
+  };
+}
 export function recordCompletion(snapshot, key, level, run, cost = 0) {
   if (run.phase !== 'complete') return snapshot;
   const bucket = level.kind === 'discovery' ? 'discoveries' : 'completions';

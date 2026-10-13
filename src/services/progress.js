@@ -1,5 +1,6 @@
 import { getLevel, levels } from '../content/levels.js';
 import { manifest } from '../content/daily-manifest.js';
+import { entriesFor, dailyKey } from './daily.js';
 import { newRun, graphFor, move } from '../model/commands.js';
 import { discoveryComplete } from '../model/rules.js';
 import { applyEdits } from '../model/repair.js';
@@ -25,10 +26,9 @@ export function resolveDailyLink(hash, snapshot, entries = manifest) {
     return null;
   if (parts.length === 4)
     return resolveSavedSelection(`daily:${parts[1]}:${parts[2]}:${type}`, entries);
-  const keys = entries
-    .filter((e) => e.date === parts[1] && e[type])
-    .sort((a, b) => b.revision - a.revision)
-    .map((e) => `daily:${e.date}:${e.revision}:${type}`);
+  const keys = entriesFor(parts[1], entries)
+    .filter((e) => e[type])
+    .map((e) => dailyKey(e, type));
   const started =
     keys.find((k) => k === snapshot.lastLevel) ??
     keys.find((k) => snapshot.runs[k] || snapshot.completions[k]);

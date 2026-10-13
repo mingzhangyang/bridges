@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { allLevels, levels, commissions, getLevel } from '../src/content/levels.js';
+import { allLevels, levels, commissions, getLevel, nodeNames } from '../src/content/levels.js';
 import { eulerRoute } from '../src/model/euler.js';
 import { replay } from '../src/services/replay.js';
 import { geometry } from '../src/render/geometry.js';
@@ -11,18 +11,16 @@ test('campaign and commissions are complete and stable', () => {
   assert.equal(new Set(allLevels.map((l) => l.id)).size, 40);
 });
 // Titles may only name islands that are on the map, and "X to Y" titles must match the endpoints.
-const places = [
-  [['灯塔', 'lighthouse'], ['A']],
-  [['北岸', 'north quay'], ['B']],
-  [['南岸', 'south quay'], ['C']],
+// Island names come from the level data; aliases cover shortened forms used in titles.
+const aliases = [
   [['quay'], ['B', 'C']],
-  [['东岛', 'east island'], ['D']],
-  [['花园', 'garden'], ['E']],
-  [['船坞', 'dock'], ['F']],
-  [['钟楼', 'belfr'], ['G']],
-  [['鱼市', '集市', '小市', 'market'], ['H']],
-  [['书屋', 'library'], ['I']],
-  [['远港', 'outer harbour'], ['J']],
+  [['belfr'], ['G']],
+  [['集市', '小市', 'market'], ['H']],
+  [['灯塔'], ['A']],
+];
+const places = [
+  ...Object.entries(nodeNames).map(([id, [zh, en]]) => [[zh, en.toLowerCase()], [id]]),
+  ...aliases,
 ];
 const named = (text) =>
   places

@@ -1,12 +1,18 @@
 import { otherEnd } from './graph.js';
-import { applyEdits, previewBlueprint } from './repair.js';
+import { applyEdits, previewBlueprint, draftCost } from './repair.js';
 import { routeComplete, availableEdges, discoveryComplete } from './rules.js';
 import { replay } from '../services/replay.js';
+// randomUUID exists only in secure contexts; getRandomValues also works over plain http (LAN).
+function runId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 export function newRun(level, assistance = false) {
   return {
     levelId: level.id,
     levelRevision: level.revision,
-    runId: globalThis.crypto.randomUUID(),
+    runId: runId(),
     finalEditSet: [],
     draftEdits: [],
     editHistory: [],
@@ -97,8 +103,7 @@ export function restoreRun(level, saved) {
     if (
       new Set(saved.draftEdits).size !== saved.draftEdits.length ||
       saved.draftEdits.some((id) => !candidates.some((e) => e.id === id)) ||
-      saved.draftEdits.reduce((n, id) => n + (candidates.find((e) => e.id === id)?.cost ?? 1), 0) >
-        (level.budget ?? 0)
+      draftCost(level, saved.draftEdits) > (level.budget ?? 0)
     )
       return null;
     if (level.fixedStart && saved.startNode !== level.fixedStart) return null;

@@ -1,6 +1,13 @@
 import { validateGraph, degrees, components } from './graph.js';
 import { eulerRoute, feasibility } from './euler.js';
 import { replay } from '../services/replay.js';
+// Budget cost of a draft, before any feasibility checks (used for live budget display).
+export function draftCost(level, ids) {
+  return ids.reduce(
+    (n, id) => n + ((level.candidateEdits ?? []).find((e) => e.id === id)?.cost ?? 1),
+    0,
+  );
+}
 export function previewBlueprint(level, ids) {
   if (!Array.isArray(ids) || new Set(ids).size !== ids.length) throw new Error('Duplicate edits');
   const candidates = level.candidateEdits ?? [];
@@ -49,7 +56,13 @@ export function applyEdits(level, ids) {
     throw new Error('Unwalkable objective');
   return { graph, cost };
 }
+// The minimal-cost proof depends only on the (immutable) level, so it is computed once.
+const solutions = new WeakMap();
 export function repairSolution(level) {
+  if (!solutions.has(level)) solutions.set(level, searchRepair(level));
+  return solutions.get(level);
+}
+function searchRepair(level) {
   const edits = level.candidateEdits ?? [];
   if (edits.length > 12 || level.budget > 3) throw new Error('Search bounds exceeded');
   let best = null;

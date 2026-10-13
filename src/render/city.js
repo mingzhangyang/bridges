@@ -1,6 +1,7 @@
 import { degrees, remainingGraph } from '../model/graph.js';
 import { bridgeAction, candidateFor, nodeAction, visibleEdges } from '../model/interaction.js';
 import { bridgeLabel, nodeLabel } from './labels.js';
+import { escape as esc } from './escape.js';
 const waters = [
   ['#d4e7e7', '#86b5c2'],
   ['#dae6d8', '#83b3b2'],
@@ -13,11 +14,6 @@ const palettes = [
   ['#c7cfb8', '#8e9c76', '#a47755'],
   ['#819aa5', '#496777', '#bd8968'],
 ];
-const esc = (s) =>
-  String(s).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-  );
 function building(x, y, i, palette) {
   const w = 17 + (i % 4) * 4,
     h = 18 + (i % 3) * 6,

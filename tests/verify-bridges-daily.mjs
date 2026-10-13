@@ -6,7 +6,7 @@ import { getLevel, levels, commissions } from '../src/content/levels.js';
 import { resolveDailyLink, resolveSavedSelection } from '../src/services/progress.js';
 import { extendSchedule } from '../tools/generators/daily-schedule.mjs';
 import { initialSettings } from '../src/services/settings.js';
-import { emptySnapshot, storageAdapter, recordCompletion } from '../src/storage.js';
+import { emptySnapshot, storageAdapter, recordCompletion, mergeSnapshots } from '../src/storage.js';
 import { newRun, move, confirmBlueprint } from '../src/model/commands.js';
 import { applyEdits, repairSolution } from '../src/model/repair.js';
 import { hint } from '../src/services/hints.js';
@@ -200,4 +200,54 @@ test('invalid lastLevel recovers the navigation field without discarding valid r
   const saved = { ...emptySnapshot(), lastLevel: 1 };
   const adapter = storageAdapter(() => ({ getItem: () => JSON.stringify(saved) }));
   assert.equal(adapter.read().lastLevel, 'SB01');
+});
+
+test('a wrong free start is answered with a way back to choose again', () => {
+  const l = getLevel('SB04'),
+    r = move(l, { ...newRun(l), startNode: 'B', currentNode: 'B', history: ['B'] }, 'b1').run;
+  const h = hint(l, r, 3);
+  assert.equal(h.kind, 'start');
+  assert.equal(h.steps, 1);
+  assert.equal(h.index, 0);
+});
+test('discovery witnesses compare islands as a set', () => {
+  const l = getLevel('SB24'),
+    base = { ...newRun(l), phase: 'complete', explained: true };
+  const s = recordCompletion(emptySnapshot(), l.id, l, {
+    ...base,
+    discoveryNodes: ['A', 'B', 'C', 'D'],
+  });
+  assert.equal(
+    recordCompletion(s, l.id, l, { ...base, runId: 'again', discoveryNodes: ['D', 'C', 'B', 'A'] }),
+    s,
+  );
+});
+test('merging another tab keeps both tabs records and this tab open run', () => {
+  const ours = {
+      ...emptySnapshot(),
+      completions: { SB01: { independent: { runId: 'a' } } },
+      runs: { SB02: { runId: 'mine' }, SB03: { runId: 'old' } },
+    },
+    theirs = {
+      ...emptySnapshot(),
+      completions: { SB05: { assisted: { runId: 'b' } }, SB01: { assisted: { runId: 'c' } } },
+      runs: { SB02: { runId: 'stale' }, SB03: { runId: 'new' } },
+      assistance: { 'daily:2026-10-12:1:walk': true },
+    };
+  const merged = mergeSnapshots(ours, theirs, 'SB02');
+  assert.deepEqual(Object.keys(merged.completions.SB01).sort(), ['assisted', 'independent']);
+  assert.ok(merged.completions.SB05.assisted);
+  assert.equal(merged.runs.SB02.runId, 'mine');
+  assert.equal(merged.runs.SB03.runId, 'new');
+  assert.equal(merged.assistance['daily:2026-10-12:1:walk'], true);
+});
+test('runs start without crypto.randomUUID (plain http on a LAN address)', () => {
+  const original = globalThis.crypto.randomUUID;
+  Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true });
+  try {
+    const id = newRun(getLevel('SB01')).runId;
+    assert.match(id, /^[0-9a-f]{32}$/);
+  } finally {
+    Object.defineProperty(globalThis.crypto, 'randomUUID', { value: original, configurable: true });
+  }
 });

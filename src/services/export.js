@@ -1,12 +1,7 @@
-export async function postcardBlob(svg, { title, subtitle, includeRoute = false }) {
+// The caller renders the scene with or without the route; this only rasterizes it.
+export async function postcardBlob(svg, { title, subtitle }) {
   const clone = svg.cloneNode(true);
   clone.querySelectorAll('.bridge-hit,.node-hit,.traveler,.degree').forEach((n) => n.remove());
-  if (!includeRoute)
-    clone.querySelectorAll('.walked').forEach((n) => {
-      n.classList.remove('walked');
-      n.querySelectorAll('circle').forEach((c) => c.remove());
-      n.querySelector('.bridge-deck')?.setAttribute('stroke', '#b79b74');
-    });
   const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
   style.textContent =
     '.bridge-shadow{fill:none;stroke:#406c7b;stroke-width:21;opacity:.15}.bridge-rail{fill:none;stroke:#796f57;stroke-width:18}.bridge-deck{fill:none;stroke-width:13}.bridge-grain{fill:none;stroke:#f1e2c5;stroke-width:1;stroke-dasharray:2 7}.node-dot{fill:#eae6d7;stroke:#697f78;stroke-width:2}.node-letter{font:15px sans-serif;fill:#344e52}.land-name{font:14px sans-serif;fill:#344e52}.graph-view .terrain{opacity:.1}.slot-label{font:20px sans-serif}';

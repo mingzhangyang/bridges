@@ -76,7 +76,7 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
     gesture = null;
     stage.releasePointerCapture(e.pointerId);
     if (g.moved || g.committed) return;
-    const { geo, graph, canSelectNode } = state(),
+    const { geo, graph, canSelectNode, actionable } = state(),
       p = point(e);
     if (!p) return;
     // Capture retargets pointerup to the stage. Preserve the pressed island explicitly; an island
@@ -89,9 +89,13 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
     }
     const svg = stage.querySelector('svg'),
       radius = (22 * geo.w) / svg.getBoundingClientRect().width;
-    const found = hits(p, geo, graph.edges, radius);
-    if (found.length > 1) choose(found);
-    else if (found.length === 1) submit(found[0].id);
+    const found = hits(p, geo, graph.edges, radius),
+      open = found.filter((e) => actionable(e.id));
+    // Only bridges that can be acted on compete for an overlapping tap; with none, the first hit
+    // still explains why it is closed.
+    if (open.length > 1) choose(open);
+    else if (open.length === 1) submit(open[0].id);
+    else if (found.length) submit(found[0].id);
   });
   const cancel = () => {
     gesture = null;

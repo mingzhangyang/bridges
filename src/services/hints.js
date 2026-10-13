@@ -27,8 +27,11 @@ export function hint(graph, run, tier) {
           node: previous.currentNode,
         };
     }
+    // Even the empty journey fails from this start: go back to the beginning to choose again.
     return {
       kind: 'start',
+      steps,
+      index: 0,
       nodes: Object.entries(degrees(graph))
         .filter(([, d]) => d % 2)
         .map(([id]) => id),
