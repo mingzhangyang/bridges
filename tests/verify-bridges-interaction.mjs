@@ -121,6 +121,7 @@ test('rendered scene exposes exactly the actionable elements as tab stops', () =
   assert.deepEqual(stops, actionableBridges(l, l, run));
   assert.doesNotMatch(svg, /data-node="[^"]+" role="button"/);
   const preview = citySVG(l, l, run, geo, { lang: 'en', interactive: false });
+  assert.doesNotMatch(preview, /data-(bridge|node)=/);
   assert.doesNotMatch(preview, /tabindex|role="button"/);
 });
 

@@ -125,7 +125,7 @@ const strings = {
     '每座桥只能走一次，陆地可以重复经过。点击桥最方便；也可从信使所在陆地沿桥拖到另一端。松手不会清空路线。键盘可用 Tab 或方向键选桥，Enter 过桥。镜片只改变视图，不算提示。连接计数和提示会记录辅助。工程先建设，再亲自走通；历史七桥关通过观察与解释完成。',
     'Cross each bridge once. Islands can be revisited. Click bridges, or drag from the messenger along a bridge to its other end. Releasing does not clear your path. Use Tab or arrow keys to select a bridge, Enter to cross. The graph lens changes only the view. Counts and hints record assistance. Build first, then walk in engineering levels. Discover the historical puzzle through observation and explanation.',
   ],
-  chooseBridge: ['这里有两座桥，请明确选择。', 'Two bridges overlap here. Choose one.'],
+  chooseBridge: ['桥位在这里重叠，请明确选择。', 'Bridge corridors overlap here. Choose one.'],
   bridge: ['桥', 'Bridge'],
   mainNav: ['主导航', 'Main'],
   journeyControls: ['旅程操作', 'Journey controls'],
@@ -148,6 +148,15 @@ const strings = {
   hintRemaining: [
     '未走的桥已标出；连通片数量：',
     'Remaining bridges highlighted. Connected groups: ',
+  ],
+  pairAgain: ['重看配对', 'Replay pairing'],
+  hintRisk: [
+    '现在走{bridge}到{destination}，会把{islands}一侧的 {count} 座未走桥留在身后。这座桥不能再走回来；先完成那一侧。',
+    'Crossing {bridge} to {destination} now would leave {count} unvisited bridges behind around {islands}. You cannot cross it again to return; finish that side first.',
+  ],
+  hintChoicesSafe: [
+    '当前相邻桥都不会立即隔断剩余桥。每走一步后，再观察是否还有未走完的片区。',
+    'None of the adjacent bridges would strand remaining bridges immediately. Recheck the unvisited areas after each crossing.',
   ],
   hintPair: [
     '中途陆地要把进入与离开配对。落单端头只能留在起点和终点。',

@@ -34,8 +34,9 @@ import { hint } from './services/hints.js';
 import { postcardBlob, downloadBlob } from './services/export.js';
 import { geometry } from './render/geometry.js';
 import { citySVG } from './render/city.js';
-import { bridgeLabel, bridgeName } from './render/labels.js';
+import { bridgeLabel, bridgeName, placeLabel } from './render/labels.js';
 import { escape } from './render/escape.js';
+import { pairingDiagram } from './render/pairing.js';
 import { motionController } from './render/motion.js';
 import { attachPointer } from './input/pointer.js';
 import { attachKeyboard } from './input/keyboard.js';
@@ -100,6 +101,7 @@ export function startGame() {
   }
   function select(l, k = l.id, entry = null) {
     if (run) save();
+    sound.suspend();
     motion.cancel();
     cancelPointer();
     sceneGeneration++;
@@ -154,6 +156,7 @@ export function startGame() {
       view,
       counts,
       hintIds: highlight,
+      riskId: hintResult?.kind === 'risk' ? hintResult.edge : null,
     });
     if (focused?.bridge)
       $('stage').querySelector(`[data-bridge="${focused.bridge}"]`)?.focus({ preventScroll: true });
@@ -348,16 +351,32 @@ export function startGame() {
           render();
           return;
         }
+        const drawPairing = () =>
+          pairingDiagram(
+            level,
+            geometry(level, matchMedia('(max-width:700px)').matches),
+            settings.lang,
+          );
         showDialog(
           tr('discover'),
-          `<div class="stamp">Ⅱ •</div><p class="help-copy">${tr('explainText')}</p><button class="primary" data-action="understand">${tr('understand')}</button>`,
-          () => {
+          `<div id="pairing-lesson">${drawPairing()}</div><p class="help-copy">${tr('explainText')}</p><div class="export-buttons"><button data-action="replay-pairing">${tr('pairAgain')}</button><button class="primary" data-action="understand">${tr('understand')}</button></div>`,
+          (action) => {
+            if (action === 'replay-pairing') {
+              $('pairing-lesson').innerHTML = drawPairing();
+              return;
+            }
+            if (action !== 'understand') return;
             run = { ...run, phase: 'complete', explained: true };
             closeDialog();
             complete();
             render();
           },
         );
+        // A hidden lesson settles at its final state; no delayed teaching step survives it.
+        dialogCleanup = () =>
+          $('pairing-lesson')
+            ?.getAnimations({ subtree: true })
+            .forEach((animation) => animation.finish());
       };
   }
   function renderHint() {
@@ -366,7 +385,20 @@ export function startGame() {
     if (!hintResult) return;
     let text = '';
     if (hintResult.kind === 'remaining') text = tr('hintRemaining') + hintResult.groups;
-    if (hintResult.kind === 'pair') text = tr('hintPair');
+    if (hintResult.kind === 'risk') {
+      const edge = graph().edges.find((e) => e.id === hintResult.edge);
+      text = tr('hintRisk')
+        .replace('{bridge}', bridgeName(level, edge, settings.lang))
+        .replace('{destination}', placeLabel(level, hintResult.destination, settings.lang))
+        .replace('{count}', hintResult.ids.length)
+        .replace(
+          '{islands}',
+          hintResult.nodes
+            .map((id) => placeLabel(level, id, settings.lang))
+            .join(settings.lang === 'zh' ? '、' : ', '),
+        );
+    }
+    if (hintResult.kind === 'choicesSafe') text = tr('hintChoicesSafe');
     if (hintResult.kind === 'next') text = tr('hintNext') + (hintResult.edge ?? '—');
     if (hintResult.kind === 'start') text = tr('hintStart');
     if (hintResult.kind === 'rewind') text = tr('hintRewind') + hintResult.node;
@@ -462,13 +494,25 @@ export function startGame() {
     if (run.phase === 'complete' && document.activeElement?.closest('[data-bridge]'))
       $('next-level')?.focus({ preventScroll: true });
     const edge = g.edges.find((e) => e.id === id);
-    if (!settings.muted) void sound.step(edge.material, () => !settings.muted && !document.hidden);
+    const soundRun = run.runId,
+      soundGeneration = sceneGeneration;
+    if (!settings.muted)
+      void sound.step(
+        edge.material,
+        () =>
+          !settings.muted &&
+          !document.hidden &&
+          run.runId === soundRun &&
+          sceneGeneration === soundGeneration,
+        run.phase === 'complete',
+      );
     motion.walk(
       $('stage').querySelector('.traveler'),
       geo.curves[id],
       geo.nodes[from],
       geo.nodes[run.currentNode],
     );
+    if (run.phase === 'complete') motion.celebrate($('stage'));
   }
   function selectNode(id) {
     if (document.hidden || motion.busy || $('dialog').open) return;
@@ -522,6 +566,7 @@ export function startGame() {
   );
   attachKeyboard($('stage'), submit, selectNode, () => actionableBridges(level, graph(), run));
   $('undo-button').onclick = () => {
+    sound.suspend();
     motion.cancel();
     cancelPointer();
     if (run.phase === 'planning') {
@@ -539,6 +584,7 @@ export function startGame() {
     render();
   };
   $('restart-button').onclick = () => {
+    sound.suspend();
     motion.cancel();
     cancelPointer();
     const fresh = newRun(level, dailyMode() ? run.assistance || !!snapshot.assistance[key] : false);

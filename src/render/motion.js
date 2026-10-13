@@ -9,6 +9,7 @@ export function motionController(
     buffer = null,
     morphStage = null,
     walking = null;
+  const celebrations = new Set();
   const place = (element, p) => element?.setAttribute('transform', `translate(${p.x},${p.y})`);
   const finish = () => {
     cancelAnimationFrame(frame);
@@ -28,6 +29,8 @@ export function motionController(
     cancel() {
       token++;
       buffer = null;
+      for (const animation of celebrations) animation.cancel();
+      celebrations.clear();
       // The move is already committed; never leave the messenger drawn mid-bridge.
       if (walking) place(walking.element, walking.to);
       finish();
@@ -47,6 +50,21 @@ export function motionController(
         reduced() ? 0 : 460,
       );
       stage.querySelector('svg')?.classList.toggle('graph-view', view === 'graph');
+    },
+    celebrate(stage) {
+      if (reduced()) return;
+      for (const [selector, frames] of [
+        ['.city-world', [{ transform: 'scale(1)' }, { transform: 'scale(.97)' }]],
+        ['.reflections', [{ opacity: 0 }, { opacity: 0.24 }]],
+      ]) {
+        const animation = stage
+          .querySelector(selector)
+          ?.animate(frames, { duration: 1000, easing: 'ease-out' });
+        if (animation) {
+          celebrations.add(animation);
+          animation.onfinish = () => celebrations.delete(animation);
+        }
+      }
     },
     walk(element, curve, from, to) {
       this.cancel();
