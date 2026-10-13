@@ -110,9 +110,8 @@ async function tapControl(page, selector) {
   await page.waitForTimeout(1000);
   await control.tap();
 }
-async function dragBridge(page, id, from, touch = null) {
-  await page.locator('#stage').scrollIntoViewIfNeeded();
-  const points = await page.evaluate(
+async function bridgePoints(page, id, from) {
+  return page.evaluate(
     async ({ id, from }) => {
       const { geometry } = await import('/src/render/geometry.js');
       const { getLevel } = await import('/src/content/levels.js');
@@ -127,6 +126,10 @@ async function dragBridge(page, id, from, touch = null) {
     },
     { id, from },
   );
+}
+async function dragBridge(page, id, from, touch = null) {
+  await page.locator('#stage').scrollIntoViewIfNeeded();
+  const points = await bridgePoints(page, id, from);
   if (touch) {
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [points[0]] });
     for (const point of points.slice(1))
@@ -165,6 +168,55 @@ async function assertTextContrast(page, pairs) {
     assert.ok(ratio >= 4.5, `${foreground} on ${background}: ${ratio.toFixed(2)}:1`);
 }
 try {
+  await scenario(
+    'One held drag crosses consecutive bridges with normal and reduced motion',
+    async () => {
+      for (const normalMotion of [true, false]) {
+        const { page, context } = await pageFor({ normalMotion });
+        await page.goto(`${base}/?lang=en`);
+        await page.waitForSelector('[data-bridge]');
+        await page.locator('#stage').scrollIntoViewIfNeeded();
+        const level = getLevel('SB01'),
+          route = eulerRoute(level, level.fixedStart);
+        let current = route.start,
+          count = 0;
+        for (const id of route.edges) {
+          const points = await bridgePoints(page, id, current);
+          if (count === 0) {
+            await page.mouse.move(points[0].x, points[0].y);
+            await page.mouse.down();
+          }
+          for (const point of points.slice(1)) await page.mouse.move(point.x, point.y);
+          count++;
+          assert.equal(
+            await page.locator('#progress-number').textContent(),
+            `${count} / ${level.edges.length}`,
+          );
+          const edge = level.edges.find((edge) => edge.id === id);
+          current = edge.u === current ? edge.v : edge.u;
+          // Keep the pointer held while the bounded 330 ms crossing animation unlocks.
+          // Render can already show the committed destination before that lock ends.
+          if (normalMotion) await page.waitForTimeout(400);
+          await page.waitForFunction(async (node) => {
+            const { geometry } = await import('/src/render/geometry.js');
+            const { getLevel } = await import('/src/content/levels.js');
+            const expected = geometry(getLevel('SB01')).nodes[node];
+            const matrix = document
+              .querySelector('#stage .traveler')
+              .transform.baseVal.consolidate()?.matrix;
+            return matrix && Math.hypot(matrix.e - expected.x, matrix.f - expected.y) < 0.01;
+          }, current);
+        }
+        await page.mouse.up();
+        assert.equal(await page.locator('#complete-banner').isVisible(), true);
+        assert.equal(
+          await page.locator('#progress-number').textContent(),
+          `${count} / ${level.edges.length}`,
+        );
+        await context.close();
+      }
+    },
+  );
   const { page, context } = await pageFor();
   await page.goto(`${base}/?lang=en`);
   await page.waitForSelector('[data-bridge]');

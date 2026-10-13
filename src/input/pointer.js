@@ -42,11 +42,14 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
       );
       gesture.trace = advanceTrace(gesture.trace, p, geo);
       if (gesture.trace?.complete) {
-        const edge = gesture.trace.complete;
+        const edge = gesture.trace.complete,
+          destination = edge.u === gesture.trace.node ? edge.v : edge.u;
+        // Finish the local transition before calling out: submit may update the run
+        // in place, replace it, or cancel this gesture during a scene change.
         gesture.committed = true;
-        submit(edge.id);
         gesture.trace = null;
-        gesture.start = geo.nodes[edge.u === run.currentNode ? edge.v : edge.u];
+        gesture.start = geo.nodes[destination];
+        submit(edge.id);
       }
     }
   });
