@@ -71,12 +71,21 @@ test('Island names never sit on a bridge deck, another island or another name', 
         for (const counts of [false, true]) {
           const geo = geometry(level, portrait),
             names = placeNames(level, geo, lang, counts);
-          // clear is the gap past a bridge's railing; a 7 px deck half-width stays free.
-          for (const [id, name] of Object.entries(names))
-            assert.ok(
-              name.clear >= -7,
-              `${level.id} ${portrait ? 'portrait' : 'landscape'} ${lang}${counts ? ' counts' : ''}: ${id}`,
-            );
+          // Measured against each densely sampled centreline, independently of the placement
+          // scorer: every name box stays outside the 14 px deck (7 px either side).
+          for (const [id, { box }] of Object.entries(names))
+            for (const curve of Object.values(geo.curves))
+              for (let i = 0; i <= 512; i++) {
+                const p = curve.point(i / 512),
+                  gap = Math.hypot(
+                    Math.max(box.x0 - p.x, 0, p.x - box.x1),
+                    Math.max(box.y0 - p.y, 0, p.y - box.y1),
+                  );
+                assert.ok(
+                  gap >= 7,
+                  `${level.id} ${portrait ? 'portrait' : 'landscape'} ${lang}${counts ? ' counts' : ''}: ${id}`,
+                );
+              }
         }
 });
 test('Every bridge lands on the quays of both its islands', () => {
