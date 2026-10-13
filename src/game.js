@@ -23,13 +23,13 @@ import { storageAdapter, recordCompletion } from './storage.js';
 import {
   resolveSaveKey,
   resolveSavedSelection,
+  resolveDailyLink,
   levelUnlocked as isLevelUnlocked,
   sanitizeProgress,
   chapterUnlocked as isChapterUnlocked,
 } from './services/progress.js';
 import { initialSettings } from './services/settings.js';
-import { dailyEntry, dailyKey } from './services/daily.js';
-import { manifest } from './content/daily-manifest.js';
+import { dailyEntry, dailyHash, dailyKey } from './services/daily.js';
 import { hint } from './services/hints.js';
 import { postcardBlob, downloadBlob } from './services/export.js';
 import { geometry } from './render/geometry.js';
@@ -124,9 +124,7 @@ export function startGame() {
     save();
     render();
     complete();
-    const hash = daily
-      ? `daily/${daily.date}/${key.endsWith('repair') ? 'repair' : 'walk'}`
-      : level.id;
+    const hash = daily ? dailyHash(daily, key.endsWith('repair') ? 'repair' : 'walk') : level.id;
     history.replaceState(null, '', `#${hash}`);
   }
   function showDialog(title, html, onAction = null) {
@@ -893,20 +891,7 @@ export function startGame() {
   window.addEventListener('hashchange', navigateHash);
   function navigateHash() {
     const hash = location.hash.slice(1);
-    const dailyParts = hash.split('/');
-    if (
-      dailyParts.length === 3 &&
-      dailyParts[0] === 'daily' &&
-      ['walk', 'repair'].includes(dailyParts[2])
-    ) {
-      const entry = manifest.find((e) => e.date === dailyParts[1]);
-      const requested = entry && resolveSavedSelection(frozenKey(entry, dailyParts[2]));
-      if (canSelect(requested)) {
-        select(requested.level, requested.key, requested.entry);
-        return;
-      }
-    }
-    const requested = resolveSavedSelection(hash);
+    const requested = resolveDailyLink(hash, snapshot) ?? resolveSavedSelection(hash);
     if (canSelect(requested)) {
       select(requested.level, requested.key, requested.entry);
       return;

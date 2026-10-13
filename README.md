@@ -21,7 +21,7 @@ npm ci
 npm run dev
 ```
 
-访问 `http://127.0.0.1:4173`。支持 `?lang=zh|en&theme=light|dark`；有效本地偏好优先，静音不接受入口参数。主线深链例如 `/#SB08`，需要满足章节解锁条件；工程委托为 `/#EC01`，每日为 `/#daily/2026-10-12/walk`。
+访问 `http://127.0.0.1:4173`。支持 `?lang=zh|en&theme=light|dark`；有效本地偏好优先，静音不接受入口参数。主线深链例如 `/#SB08`，需要满足章节解锁条件；工程委托为 `/#EC01`，每日为 `/#daily/2026-10-12/1/walk`（日期 / revision / 题型）；不带 revision 的旧链接 `/#daily/2026-10-12/walk` 会打开该日已开始的版本，否则打开最新版本。
 
 ## 验证与构建
 
@@ -31,9 +31,9 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-`check` 包含统一格式、JavaScript 语法、独立运行边界、70 项数学 / 内容 / 持久化测试和静态构建。浏览器检查会通过真实 UI 走完所有可行关，单独完成历史发现，并覆盖回放、输入、存档、日界线、动画取消、320px 布局与 CPU 限速下的模型耗时。截图与测量保存在 `test-results/`，CI 上传为验收附件。
+`check` 包含统一格式、JavaScript 语法、独立运行边界、数学 / 内容 / 持久化 / 交互单元测试和静态构建。浏览器检查会通过真实 UI 走完所有可行关，单独完成历史发现，并覆盖回放、输入、存档、日界线、动画取消、320px 布局与 CPU 限速下的模型耗时。截图与测量保存在 `test-results/`，CI 上传为验收附件。
 
-`npm run build` 生成 `dist/` 和完整关卡见证 `content-proof.json`。更新每日清单时执行 `node tools/generators/daily-build.mjs`，审阅排期，运行格式化与全部验收，再发布；构建不会根据当前日期偷偷改题。
+`npm run build` 生成 `dist/` 和完整关卡见证 `content-proof.json`。更新每日清单时执行 `node tools/generators/daily-build.mjs`，审阅排期，运行格式化与全部验收，再发布；生成器只追加缺少的日期，不改写已发布条目，构建也不会根据当前日期偷偷改题。
 
 ## 文档
 

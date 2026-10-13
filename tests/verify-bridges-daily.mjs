@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { manifest } from '../src/content/daily-manifest.js';
-import { shanghaiDate, dailyEntry, dailyKey } from '../src/services/daily.js';
-import { getLevel } from '../src/content/levels.js';
+import { shanghaiDate, dailyEntry, dailyKey, dailyHash } from '../src/services/daily.js';
+import { getLevel, levels, commissions } from '../src/content/levels.js';
+import { resolveDailyLink, resolveSavedSelection } from '../src/services/progress.js';
+import { extendSchedule } from '../tools/generators/daily-schedule.mjs';
 import { initialSettings } from '../src/services/settings.js';
 import { emptySnapshot, storageAdapter, recordCompletion } from '../src/storage.js';
 import { newRun, move } from '../src/model/commands.js';
@@ -10,15 +12,52 @@ import { hint } from '../src/services/hints.js';
 import { sweep, hits } from '../src/input/bridge-hit-test.js';
 import { geometry } from '../src/render/geometry.js';
 test('366 offline dates are contiguous, with walk daily and repair on weekends only', () => {
-  assert.equal(manifest.length, 366);
-  for (let i = 0; i < manifest.length; i++) {
-    const entry = manifest[i];
+  const dates = [...new Set(manifest.map((e) => e.date))];
+  assert.equal(dates.length, 366);
+  for (let i = 1; i < dates.length; i++)
+    assert.equal(new Date(dates[i]) - new Date(dates[i - 1]), 86400000);
+  for (const entry of manifest) {
     assert.equal(getLevel(entry.walk).kind, 'walk');
     const day = new Date(entry.date).getUTCDay();
     assert.equal(!!entry.repair, [0, 6].includes(day));
     if (entry.repair) assert.equal(getLevel(entry.repair).kind, 'repair');
-    if (i) assert.equal(new Date(entry.date) - new Date(manifest[i - 1].date), 86400000);
   }
+  // Each day's revisions are 1..n with no gaps or duplicates, so older ones were never dropped.
+  for (const date of dates)
+    assert.deepEqual(
+      manifest.filter((e) => e.date === date).map((e) => e.revision),
+      Array.from({ length: manifest.filter((e) => e.date === date).length }, (_, i) => i + 1),
+      date,
+    );
+});
+const revised = [
+  { date: '2026-10-12', revision: 1, walk: 'SB01', repair: null },
+  { date: '2026-10-12', revision: 2, walk: 'SB08', repair: null },
+];
+test('a revised day keeps its published revision resolvable and offers the newest', () => {
+  assert.equal(dailyEntry(new Date('2026-10-12T00:00Z'), revised).revision, 2);
+  assert.equal(resolveSavedSelection('daily:2026-10-12:1:walk', revised).level.id, 'SB01');
+  assert.equal(dailyHash(revised[0]), 'daily/2026-10-12/1/walk');
+  const fresh = emptySnapshot();
+  assert.equal(resolveDailyLink('daily/2026-10-12/1/walk', fresh, revised).level.id, 'SB01');
+  assert.equal(resolveDailyLink('daily/2026-10-12/walk', fresh, revised).level.id, 'SB08');
+  const started = { ...fresh, runs: { 'daily:2026-10-12:1:walk': {} } };
+  assert.equal(resolveDailyLink('daily/2026-10-12/walk', started, revised).level.id, 'SB01');
+  const last = { ...started, lastLevel: 'daily:2026-10-12:2:walk' };
+  assert.equal(resolveDailyLink('daily/2026-10-12/walk', last, revised).level.id, 'SB08');
+  for (const bad of ['daily/2026-10-12/3/walk', 'daily/2026-10-12/fly', 'daily/2030-01-01/walk'])
+    assert.equal(resolveDailyLink(bad, fresh, revised), null, bad);
+});
+test('the schedule generator only appends and never rewrites published entries', () => {
+  const options = { walks: levels.filter((l) => l.kind === 'walk'), commissions };
+  assert.deepEqual(extendSchedule(manifest, options), manifest);
+  const withRevision = [...manifest, { ...manifest[3], revision: 2, walk: 'SB02' }];
+  const extended = extendSchedule(withRevision, options);
+  assert.equal(extended.length, manifest.length + 1);
+  assert.deepEqual(
+    extended.filter((e) => e.date === manifest[3].date),
+    [manifest[3], { ...manifest[3], revision: 2, walk: 'SB02' }],
+  );
 });
 test('daily UTC+8 boundary, frozen revisions and out-of-range handling', () => {
   assert.equal(shanghaiDate(new Date('2026-10-12T15:59:59Z')), '2026-10-12');

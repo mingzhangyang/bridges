@@ -3,7 +3,7 @@ import { manifest } from '../content/daily-manifest.js';
 import { newRun, graphFor, move } from '../model/commands.js';
 import { discoveryComplete } from '../model/rules.js';
 import { applyEdits } from '../model/repair.js';
-export function resolveSavedSelection(key) {
+export function resolveSavedSelection(key, entries = manifest) {
   if (typeof key !== 'string') return null;
   if (!key.startsWith('daily:')) {
     const level = getLevel(key);
@@ -11,9 +11,28 @@ export function resolveSavedSelection(key) {
   }
   const parts = key.split(':');
   if (parts.length !== 4 || !['walk', 'repair'].includes(parts[3])) return null;
-  const entry = manifest.find((e) => e.date === parts[1] && String(e.revision) === parts[2]);
+  const entry = entries.find((e) => e.date === parts[1] && String(e.revision) === parts[2]);
   const level = entry?.[parts[3]] ? getLevel(entry[parts[3]]) : null;
   return level ? { level, key, entry } : null;
+}
+// Daily links: #daily/<date>/<revision>/<type> names one frozen challenge. The older
+// #daily/<date>/<type> form reopens the revision this player already started for that day,
+// otherwise the newest revision.
+export function resolveDailyLink(hash, snapshot, entries = manifest) {
+  const parts = typeof hash === 'string' ? hash.split('/') : [],
+    type = parts.at(-1);
+  if (parts[0] !== 'daily' || ![3, 4].includes(parts.length) || !['walk', 'repair'].includes(type))
+    return null;
+  if (parts.length === 4)
+    return resolveSavedSelection(`daily:${parts[1]}:${parts[2]}:${type}`, entries);
+  const keys = entries
+    .filter((e) => e.date === parts[1] && e[type])
+    .sort((a, b) => b.revision - a.revision)
+    .map((e) => `daily:${e.date}:${e.revision}:${type}`);
+  const started =
+    keys.find((k) => k === snapshot.lastLevel) ??
+    keys.find((k) => snapshot.runs[k] || snapshot.completions[k]);
+  return keys.length ? resolveSavedSelection(started ?? keys[0], entries) : null;
 }
 export function resolveSaveKey(key) {
   return resolveSavedSelection(key)?.level ?? null;

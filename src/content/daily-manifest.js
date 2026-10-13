@@ -1,4 +1,4 @@
-// Offline schedule: 2026-10-12 through 2027-10-12. Verified by the content suite.
+// Offline schedule: 2026-10-12 through 2027-10-12. Append-only; verified by the content suite.
 export const manifest = [
   {
     date: '2026-10-12',

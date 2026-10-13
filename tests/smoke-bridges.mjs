@@ -676,7 +676,7 @@ try {
   await dailyResume.page.goto(base);
   await scenario('Valid weekend work resumes without campaign progression', async () => {
     assert.equal(await dailyResume.page.locator('#level-number').textContent(), '2026-10-17');
-    assert.ok(dailyResume.page.url().endsWith('#daily/2026-10-17/repair'));
+    assert.ok(dailyResume.page.url().endsWith('#daily/2026-10-17/1/repair'));
   });
   await dailyResume.context.close();
   assert.deepEqual(errors, []);
