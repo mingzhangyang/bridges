@@ -7,7 +7,8 @@ import { resolveDailyLink, resolveSavedSelection } from '../src/services/progres
 import { extendSchedule } from '../tools/generators/daily-schedule.mjs';
 import { initialSettings } from '../src/services/settings.js';
 import { emptySnapshot, storageAdapter, recordCompletion } from '../src/storage.js';
-import { newRun, move } from '../src/model/commands.js';
+import { newRun, move, confirmBlueprint } from '../src/model/commands.js';
+import { applyEdits, repairSolution } from '../src/model/repair.js';
 import { hint } from '../src/services/hints.js';
 import { sweep, hits } from '../src/input/bridge-hit-test.js';
 import { geometry } from '../src/render/geometry.js';
@@ -137,6 +138,25 @@ test('independent and assisted seals remain separate; daily resets cannot erase 
   assert.equal(s.completions.daily.independent, undefined);
   assert.ok(s.completions.daily.assisted);
   assert.equal(recordCompletion(s, 'daily', l, { ...r, runId: 'third' }), s);
+});
+test('the latest distinct route replaces an equal-cost witness; cheaper works are kept', () => {
+  const l = getLevel('SB01');
+  const walk = (ids, runId = 'run') => {
+    let r = { ...newRun(l), runId };
+    for (const id of ids) r = move(l, r, id).run;
+    return r;
+  };
+  let s = recordCompletion(emptySnapshot(), l.id, l, walk(['b1', 'b2', 'b3']));
+  // Same run after a replay rewind, finished along a different route.
+  s = recordCompletion(s, l.id, l, walk(['b3', 'b2', 'b1']));
+  assert.deepEqual(s.completions.SB01.independent.edges, ['b3', 'b2', 'b1']);
+  assert.equal(recordCompletion(s, l.id, l, walk(['b3', 'b2', 'b1'], 'reloaded')), s);
+  const works = getLevel('SB25'),
+    { ids, route } = repairSolution(works);
+  let plan = confirmBlueprint(works, { ...newRun(works), draftEdits: ids });
+  for (const id of route.edges) plan = move(applyEdits(works, ids).graph, plan, id).run;
+  const cheap = recordCompletion(emptySnapshot(), works.id, works, plan, 1);
+  assert.equal(recordCompletion(cheap, works.id, works, { ...plan, runId: 'x' }, 2), cheap);
 });
 test('hints on a doomed prefix return an actual recoverable fork', () => {
   const l = getLevel('SB08');

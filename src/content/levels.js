@@ -49,13 +49,13 @@ const specs = [
   ],
   [['渡口的选择', 'A choice at the ferry'], 'AB BC CA CD DE EF FD', { fixedStart: 'C' }],
   [['木桥双影', 'Twin wooden bridges'], 'AB AB BC', { fixedStart: 'B' }],
-  [['绕过花园', 'Around the garden'], 'AB BC CD DA AC', {}],
-  [['给船坞送信', 'A letter for the dock'], 'AB BC CA AD DE EF FD', { fixedEnd: 'D' }],
+  [['方城对角', 'Across the square'], 'AB BC CD DA AC', {}],
+  [['给东岛送信', 'A letter for East island'], 'AB BC CA AD DE EF FD', { fixedEnd: 'D' }],
   [['再访灯塔', 'The lighthouse again'], 'AB BC CA AD DE EA', {}],
   [['河湾三岔', 'Three ways at the bend'], 'AB BC CD DA AE EF FA', { fixedStart: 'A' }],
   [['两座广场', 'Two squares'], 'AB BC CA DE EF FD CD', {}],
   [['回到晨港', 'Back to the harbour'], 'AB BC CA', { objective: 'return', fixedStart: 'A' }],
-  [['集市的双桥', 'Market twins'], 'AB AB BC BC CA CA', { objective: 'return' }],
+  [['成对的桥', 'Bridges in pairs'], 'AB AB BC BC CA CA', { objective: 'return' }],
   [['两条运河', 'Two canals'], 'AB BC CD DA AE EF FA', { objective: 'return', fixedStart: 'A' }],
   [
     ['钟楼晚信', 'The belfry letter'],
@@ -63,7 +63,7 @@ const specs = [
     { objective: 'return', fixedStart: 'A' },
   ],
   [['留一条归路', 'Leave a way home'], 'AB BC CA CD DE EF FD DG GH HD', { fixedStart: 'C' }],
-  [['桥头小市', 'Quayside market'], 'AB BC CD DA AE EF FG GA', { objective: 'return' }],
+  [['两环相会', 'Where two loops meet'], 'AB BC CD DA AE EF FG GA', { objective: 'return' }],
   [['三环相扣', 'Three loops'], 'AB BC CA AD DE EF FA AG GH HA', { objective: 'return' }],
   [
     ['日落前归港', 'Home before sunset'],
@@ -87,7 +87,7 @@ const specs = [
     { fixedStart: 'A', fixedEnd: 'B' },
   ],
   [
-    ['北岸到书屋', 'From quay to library'],
+    ['灯塔到东岛', 'Lighthouse to East island'],
     'AB BC CA AD DE EF FD DG GH HI ID',
     { fixedStart: 'A', fixedEnd: 'D' },
   ],
@@ -98,7 +98,7 @@ const specs = [
   ],
   [['从哪出发', 'Where shall we begin?'], 'AB BC CA CD DE EF FD FG GH HI IF', {}],
   [
-    ['灯塔与远港', 'Lighthouse to outer harbour'],
+    ['书屋到远港', 'Library to outer harbour'],
     'AB BC CD DA AE EF FA CG GH HI IC IJ',
     { fixedStart: 'I', fixedEnd: 'J' },
   ],
@@ -201,14 +201,14 @@ levels.push(
   historical('SB32', ['灯火归港', 'Harbour of lights'], 'return', 2),
 );
 export const commissions = [
-  historical('EC01', ['北岸邮路', 'North quay post'], 'open', 1),
+  historical('EC01', ['东岛邮路', 'East island post'], 'open', 1),
   engineering('EC02', ['四岸一线', 'Four quays, one journey'], 'AB AC AD AE', {
     fixedStart: 'D',
     fixedEnd: 'E',
     budget: 1,
     candidateEdits: [add('BC', 'B', 'C'), add('BE', 'B', 'E'), add('CD', 'C', 'D')],
   }),
-  engineering('EC03', ['东岛急信', 'Express to East island'], 'AB AB AC AC AD BD CD', {
+  engineering('EC03', ['南岸急信', 'Express to South quay'], 'AB AB AC AC AD BD CD', {
     fixedStart: 'B',
     fixedEnd: 'C',
     budget: 1,
@@ -222,7 +222,7 @@ export const commissions = [
     protectedEdges: ['b1', 'b2', 'b3'],
     candidateEdits: [remove('b4'), add('AB2', 'A', 'B'), add('BC2', 'B', 'C')],
   }),
-  engineering('EC06', ['三座钟楼', 'Three belfries'], 'AB BC CA CD DE EF FD DG GH HI ID', {
+  engineering('EC06', ['九岛归港', 'Nine islands home'], 'AB BC CA CD DE EF FD DG GH HI ID', {
     objective: 'return',
     fixedStart: 'A',
     candidateEdits: [add('CD2', 'C', 'D'), add('CG', 'C', 'G'), add('DH', 'D', 'H')],

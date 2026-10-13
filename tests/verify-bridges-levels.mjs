@@ -10,6 +10,47 @@ test('campaign and commissions are complete and stable', () => {
   assert.equal(levels.filter((l) => l.kind === 'discovery').length, 1);
   assert.equal(new Set(allLevels.map((l) => l.id)).size, 40);
 });
+// Titles may only name islands that are on the map, and "X to Y" titles must match the endpoints.
+const places = [
+  [['灯塔', 'lighthouse'], ['A']],
+  [['北岸', 'north quay'], ['B']],
+  [['南岸', 'south quay'], ['C']],
+  [['quay'], ['B', 'C']],
+  [['东岛', 'east island'], ['D']],
+  [['花园', 'garden'], ['E']],
+  [['船坞', 'dock'], ['F']],
+  [['钟楼', 'belfr'], ['G']],
+  [['鱼市', '集市', '小市', 'market'], ['H']],
+  [['书屋', 'library'], ['I']],
+  [['远港', 'outer harbour'], ['J']],
+];
+const named = (text) =>
+  places
+    .filter(([words]) => words.some((w) => text.toLowerCase().includes(w)))
+    .map(([, ids]) => ids);
+test('level titles name only islands on the map and agree with required endpoints', () => {
+  for (const l of allLevels) {
+    const ids = l.nodes.map((n) => n.id);
+    for (const text of l.title)
+      for (const options of named(text))
+        assert.ok(
+          options.some((id) => ids.includes(id)),
+          `${l.id} "${text}" names an island not on the map`,
+        );
+    for (const [text, sep] of [
+      [l.title[0], '到'],
+      [l.title[1], ' to '],
+    ]) {
+      const at = text.indexOf(sep);
+      if (at < 0) continue;
+      const [from] = named(text.slice(0, at)),
+        [to] = named(text.slice(at + sep.length)),
+        end = l.objective === 'return' ? l.fixedStart : l.fixedEnd;
+      if (from) assert.ok(from.includes(l.fixedStart), `${l.id} "${text}" start`);
+      if (to) assert.ok(to.includes(end), `${l.id} "${text}" destination`);
+    }
+  }
+});
 for (const l of allLevels.filter((l) => l.kind === 'walk'))
   test(`${l.id}: valid witness respects objectives`, () => {
     const r = eulerRoute(l, l.fixedStart, l.objective === 'return' ? l.fixedStart : l.fixedEnd);

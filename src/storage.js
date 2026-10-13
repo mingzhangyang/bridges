@@ -58,13 +58,16 @@ export function storageAdapter(getStorage = () => globalThis.localStorage) {
     },
   };
 }
+const sameWitness = (a, b) =>
+  ['start', 'edges', 'edits', 'discoveryNodes'].every(
+    (k) => JSON.stringify(a[k]) === JSON.stringify(b[k]),
+  );
 export function recordCompletion(snapshot, key, level, run, cost = 0) {
   if (run.phase !== 'complete') return snapshot;
   const bucket = level.kind === 'discovery' ? 'discoveries' : 'completions';
   const previous = snapshot[bucket][key] ?? {};
   const assisted = !!run.assistance || !!snapshot.assistance[key];
   const category = assisted ? 'assisted' : 'independent';
-  if (previous[category]?.runId === run.runId) return snapshot;
   const record = {
     runId: run.runId,
     revision: level.revision,
@@ -77,7 +80,9 @@ export function recordCompletion(snapshot, key, level, run, cost = 0) {
     at: new Date().toISOString(),
   };
   const existing = previous[category];
-  if (existing && existing.cost <= cost) return snapshot;
+  // A strictly cheaper engineering result is kept. Otherwise the latest distinct route becomes the
+  // postcard witness; recording the same witness again (for example on reload) changes nothing.
+  if (existing && (existing.cost < cost || sameWitness(existing, record))) return snapshot;
   return {
     ...snapshot,
     [bucket]: { ...snapshot[bucket], [key]: { ...previous, [category]: record } },
