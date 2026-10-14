@@ -64,13 +64,37 @@ test('A drag leaving every corridor cannot join a different bridge at a crossing
   assert.equal(trace.complete, undefined);
   assert.deepEqual(trace.candidates, []);
 });
-test('Island names never sit on a bridge deck, another island or another name', () => {
+test('Island names never sit on a bridge deck, another island, another name or a count badge', () => {
   for (const level of allLevels)
     for (const portrait of [false, true])
       for (const lang of ['zh', 'en'])
         for (const counts of [false, true]) {
           const geo = geometry(level, portrait),
-            names = placeNames(level, geo, lang, counts);
+            names = placeNames(level, geo, lang, counts),
+            where = `${level.id} ${portrait ? 'portrait' : 'landscape'} ${lang}${counts ? ' counts' : ''}`,
+            overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1,
+            entries = Object.entries(names);
+          for (const [i, [id, { box }]] of entries.entries()) {
+            for (const [other, name] of entries.slice(i + 1))
+              assert.ok(!overlaps(box, name.box), `${where}: ${id} overlaps ${other}`);
+            for (const node of level.nodes) {
+              const q = geo.nodes[node.id];
+              // Every other island's terrain top (72 × 47) stays clear of the name.
+              if (node.id !== id) {
+                const cx = Math.max(box.x0, Math.min(q.x, box.x1)),
+                  cy = Math.max(box.y0, Math.min(q.y, box.y1));
+                assert.ok(
+                  ((cx - q.x) / 72) ** 2 + ((cy - q.y) / 47) ** 2 >= 1,
+                  `${where}: ${id} on ${node.id}`,
+                );
+              }
+              if (counts)
+                assert.ok(
+                  !overlaps(box, { x0: q.x - 28, x1: q.x + 28, y0: q.y - 80, y1: q.y - 51 }),
+                  `${where}: ${id} covers the count badge of ${node.id}`,
+                );
+            }
+          }
           // Measured against each densely sampled centreline, independently of the placement
           // scorer: every name box stays outside the 14 px deck (7 px either side).
           for (const [id, { box }] of Object.entries(names))
@@ -81,10 +105,7 @@ test('Island names never sit on a bridge deck, another island or another name', 
                     Math.max(box.x0 - p.x, 0, p.x - box.x1),
                     Math.max(box.y0 - p.y, 0, p.y - box.y1),
                   );
-                assert.ok(
-                  gap >= 7,
-                  `${level.id} ${portrait ? 'portrait' : 'landscape'} ${lang}${counts ? ' counts' : ''}: ${id}`,
-                );
+                assert.ok(gap >= 7, `${where}: ${id} on a bridge deck`);
               }
         }
 });
