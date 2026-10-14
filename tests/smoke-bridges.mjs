@@ -797,7 +797,8 @@ try {
       });
       assert.ok(metrics.p95 < 8, JSON.stringify(metrics));
       await writeFile('test-results/model-performance.json', JSON.stringify(metrics, null, 2));
-      // Every step re-renders the scene; on a throttled phone layout that must stay cheap too.
+      // Every step re-renders the scene into the stage; on a throttled phone layout that must
+      // stay cheap too, both building the markup and the browser taking it in.
       const scene = await perfPage.evaluate(async () => {
         const { allLevels } = await import('/src/content/levels.js');
         const { newRun, move } = await import('/src/model/commands.js');
@@ -805,7 +806,15 @@ try {
         const { applyEdits, repairSolution } = await import('/src/model/repair.js');
         const { geometry } = await import('/src/render/geometry.js');
         const { citySVG } = await import('/src/render/city.js');
-        const times = [];
+        // An attached stage of phone size: the step's cost includes parsing the new scene
+        // into the page and laying it out, as renderScene does.
+        const holder = document.createElement('div');
+        holder.className = 'stage';
+        holder.style.cssText =
+          'position:absolute;left:0;top:0;width:358px;height:600px;visibility:hidden';
+        document.body.append(holder);
+        const build = [],
+          times = [];
         for (const l of allLevels.filter((l) => l.kind !== 'discovery')) {
           const proof = l.kind === 'repair' ? repairSolution(l) : null,
             graph = proof ? applyEdits(l, proof.ids).graph : l,
@@ -821,23 +830,29 @@ try {
             draftEdits: proof?.ids ?? [],
           };
           // The first scene of a level settles its layout; the walk is what must stay fast.
-          citySVG(l, graph, run, geometry(l, true), { lang: 'en' });
+          holder.innerHTML = citySVG(l, graph, run, geometry(l, true), { lang: 'en' });
           for (const id of route.edges) {
             run = move(graph, run, id).run;
-            const begin = performance.now();
-            citySVG(l, graph, run, geometry(l, true), { lang: 'en' });
+            const begin = performance.now(),
+              svg = citySVG(l, graph, run, geometry(l, true), { lang: 'en' });
+            build.push(performance.now() - begin);
+            holder.innerHTML = svg;
+            holder.querySelector('svg').getBoundingClientRect();
+            holder.querySelector('.land-name').getBBox();
             times.push(performance.now() - begin);
           }
         }
-        times.sort((a, b) => a - b);
+        holder.remove();
+        const p95 = (list) => list.sort((a, b) => a - b)[Math.floor(list.length * 0.95)];
         return {
           samples: times.length,
-          p95: times[Math.floor(times.length * 0.95)],
+          buildP95: p95(build),
+          p95: p95(times),
           max: times.at(-1),
           cpuThrottle: 6,
         };
       });
-      assert.ok(scene.p95 < 25, JSON.stringify(scene));
+      assert.ok(scene.buildP95 < 25 && scene.p95 < 250, JSON.stringify(scene));
       await writeFile('test-results/scene-performance.json', JSON.stringify(scene, null, 2));
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     },

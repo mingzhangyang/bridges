@@ -4,7 +4,7 @@ import { allLevels } from '../src/content/levels.js';
 import { geometry } from '../src/render/geometry.js';
 import { beginTrace, advanceTrace } from '../src/input/bridge-trace.js';
 import { placeNames } from '../src/render/city.js';
-import { propSpots, PROP_CLEARANCE } from '../src/render/scenery.js';
+import { propSpots } from '../src/render/scenery.js';
 
 for (const portrait of [false, true]) {
   test(`Every built and candidate corridor clears unrelated waterfronts (${portrait ? 'portrait' : 'landscape'})`, () => {
@@ -139,27 +139,42 @@ test('A level keeps one name placement per layout, language and badge setting', 
     assert.notEqual(placeNames(level, geo, 'en', false), placeNames(level, geo, 'en', true));
   }
 });
-test('Every island keeps its landmark, house and tree off its own streets', () => {
+test('Every island keeps its landmark, house and tree standing clear of its own streets', () => {
   for (const level of allLevels)
     for (const portrait of [false, true]) {
       const geo = geometry(level, portrait);
-      for (const node of level.nodes) {
+      for (const [i, node] of level.nodes.entries()) {
         const o = geo.nodes[node.id],
-          spots = propSpots(node.id, geo),
+          spots = propSpots(node.id, i, geo),
           where = `${level.id} ${portrait ? 'portrait' : 'landscape'} ${node.id}`;
-        assert.equal(spots.length, 3, where);
+        assert.deepEqual(spots.map((s) => s.role).sort(), ['house', 'landmark', 'tree'], where);
+        for (const spot of spots) assert.ok(spot.scale >= 0.7, `${where}: ${spot.role} too small`);
+        for (const [k, a] of spots.entries())
+          for (const b of spots.slice(k + 1))
+            assert.ok(
+              a.base.x1 <= b.base.x0 ||
+                b.base.x1 <= a.base.x0 ||
+                a.base.y1 <= b.base.y0 ||
+                b.base.y1 <= a.base.y0,
+              `${where}: ${a.role} and ${b.role} share ground`,
+            );
         for (const curve of Object.values(geo.curves)) {
           const end = curve.canonical.indexOf(node.id);
           if (end < 0) continue;
-          // Densely, from the square out to this island's quay.
+          // Densely, from the square's edge out to this island's quay; under the square is hidden.
           const quay = curve.ends[end].t;
           for (let k = 0; k <= 200; k++) {
-            const p = curve.point(end ? 1 - ((1 - quay) * k) / 200 : (quay * k) / 200);
-            for (const spot of spots)
-              assert.ok(
-                Math.hypot(p.x - o.x - spot.x, p.y - o.y - spot.y) >= PROP_CLEARANCE - 1,
-                `${where}: a prop stands on a street`,
+            const p = curve.point(end ? 1 - ((1 - quay) * k) / 200 : (quay * k) / 200),
+              x = p.x - o.x,
+              y = p.y - o.y;
+            if (Math.hypot(x, y) <= 22) continue;
+            for (const { role, base } of spots) {
+              const gap = Math.hypot(
+                Math.max(base.x0 - x, 0, x - base.x1),
+                Math.max(base.y0 - y, 0, y - base.y1),
               );
+              assert.ok(gap >= 4.5, `${where}: the ${role} stands on a street`);
+            }
           }
         }
       }

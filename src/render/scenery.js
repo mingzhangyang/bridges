@@ -25,15 +25,20 @@ export function shorePath(x, y, rx, ry, seed) {
 }
 export const islandSeed = (id) => id.charCodeAt(0) - 64;
 
-export function building(x, y, i, palette) {
+// Houses and trees, like landmarks, are drawn from the middle of their base, rising upward.
+function house(i, palette) {
   const w = 17 + (i % 4) * 4,
     h = 18 + (i % 3) * 6,
     roof = i % 2 ? palette[2] : '#667e88';
-  return `<g transform="translate(${x},${y})"><path d="M0 0l${w} 0 8 -6 -${w} 0Z" fill="${roof}"/><path class="wall" d="M0 0v${h}h${w}V0Z" fill="${i % 2 ? '#ede2c7' : '#dfd7bd'}"/><path class="wall-side" d="M${w} 0l8 -6v${h}l-8 6Z" fill="#a89f87"/><path class="window" d="M5 6h5v7H5Zm${w - 8} 0h4v6h-4Z" fill="#69858b"/><path class="door" d="M${w / 2 - 2} ${h}v-7h5v7" fill="#8b7c65"/></g>`;
+  return `<g transform="translate(${-(w + 8) / 2},${-h})"><path d="M0 0l${w} 0 8 -6 -${w} 0Z" fill="${roof}"/><path class="wall" d="M0 0v${h}h${w}V0Z" fill="${i % 2 ? '#ede2c7' : '#dfd7bd'}"/><path class="wall-side" d="M${w} 0l8 -6v${h}l-8 6Z" fill="#a89f87"/><path class="window" d="M5 6h5v7H5Zm${w - 8} 0h4v6h-4Z" fill="#69858b"/><path class="door" d="M${w / 2 - 2} ${h}v-7h5v7" fill="#8b7c65"/></g>`;
 }
-export const footprint = (i) => ({ w: 25 + (i % 4) * 4, h: 18 + (i % 3) * 6 });
-const tree = (x, y, palette) =>
-  `<g class="tree" fill="${palette[1]}"><circle cx="${x + 4}" cy="${y - 4}" r="11"/><circle cx="${x - 5}" cy="${y - 16}" r="8"/></g>`;
+const houseBox = (i) => {
+  const w = 25 + (i % 4) * 4,
+    h = 18 + (i % 3) * 6;
+  return [-w / 2, w / 2, -h - 6, 0];
+};
+const tree = (palette) =>
+  `<g class="tree" fill="${palette[1]}"><circle cx="4" cy="-11" r="11"/><circle cx="-5" cy="-23" r="8"/></g>`;
 const stall = (dx, palette) =>
   `<path class="wall" d="M${dx - 9} 0v-7h18v7Z" fill="#d9c7a1"/><path d="M${dx - 8} -7v-9M${dx + 8} -7v-9" stroke="#6f6a55" stroke-width="1.5"/><path d="M${dx - 11} -15h22l-3 -6h-16Z" fill="#f3ecd8"/><path d="M${dx - 11} -15h5.5l1 -6h-3.5ZM${dx} -15h5.5l-.8 -6h-4.7Z" fill="${palette[2]}"/><path d="M${dx - 5} -9q3 -2 6 0l2 -1v2l-2 -1q-3 2 -6 0Z" fill="#7d9aa3"/>`;
 // Landmarks are drawn from the middle of their base, rising upward.
@@ -68,6 +73,20 @@ const landmarks = {
   J: (p) =>
     `<path d="M-8 0h16l-3 -5h-10Z" fill="#7e776a"/><path d="M0 -5V-42" stroke="#5f6f74" stroke-width="2"/><path d="M1 -42l14 4l-14 4Z" fill="${p[2]}"/><circle class="beacon" cy="-44" r="3" fill="#ffe7a3"/>`,
 };
+// Each landmark's drawn extent around its base, as [left, right, top, bottom], before the
+// 1.2 scale it is drawn at.
+const landmarkBoxes = {
+  A: [-11, 11, -53, 3.5],
+  B: [-18, 31, -35, 4],
+  C: [-13, 24, -40, 0],
+  D: [-20, 20, -49, 0],
+  E: [-17, 17, -28, 5],
+  F: [-22, 22, -40, 2],
+  G: [-10, 13, -58, 0],
+  H: [-22, 23, -21, 0],
+  I: [-18, 18, -30, 0],
+  J: [-8, 15, -47, 0],
+};
 // Points along this island's own streets, from its square out to each quay, relative to the
 // square.
 function streetPoints(nodeId, geo) {
@@ -86,46 +105,61 @@ function streetPoints(nodeId, geo) {
   }
   return points;
 }
-// Room a prop needs from a street's centreline: its own half-width plus the 4.5 px half street.
-export const PROP_CLEARANCE = 14;
-// Where the island's three props stand, relative to its square, northernmost first: the spots
-// with the most room from the island's own streets, kept apart from each other, off the
-// square and inside the quay. Measured in pixels, so a crowded island still finds the gaps.
-export function propSpots(nodeId, geo) {
-  const streets = streetPoints(nodeId, geo),
-    candidates = [];
-  for (const r of [0.5, 0.6, 0.7])
-    for (let k = 0; k < 16; k++) {
-      const angle = (k * Math.PI) / 8,
-        x = Math.cos(angle) * r * 72,
-        y = Math.sin(angle) * r * 47;
-      if (Math.hypot(x, y) < 28) continue; // the square
-      const clear = Math.min(40, ...streets.map((p) => Math.hypot(p.x - x, p.y - y)));
-      // The square sits in front of anything south of it; keep that side for open quay.
-      candidates.push({ x, y, clear, score: clear - (Math.sin(angle) > 0.5 ? 6 : 0) });
+// A prop's base, the band it stands on, may not touch a street: 4.5 px of half street plus a
+// pixel of air. Taller parts may hide a street behind them, as anything upright would.
+export const STREET_GAP = 5.5;
+const BASE_BAND = 14;
+// The island's three props in drawing order (north first): its landmark, a house and a tree,
+// each with its base point, scale and drawn box, relative to the island's square. Each
+// island uses the largest scale at which all three stand clear of its own streets.
+export function propSpots(nodeId, i, geo) {
+  const streets = streetPoints(nodeId, geo).filter((p) => Math.hypot(p.x, p.y) > 20);
+  const roles = [
+    ['landmark', (landmarkBoxes[nodeId] ?? [-12, 12, -40, 0]).map((v) => v * 1.2)],
+    ['house', houseBox(i + 7)],
+    ['tree', [-13, 15, -31, 0]],
+  ];
+  let best = null;
+  for (const scale of [1, 0.85, 0.7]) {
+    const placed = [];
+    for (const [role, [l, r, t, b]] of roles) {
+      let pick = null;
+      for (const radius of [0.35, 0.45, 0.55, 0.65, 0.75])
+        for (let k = 0; k < 24; k++) {
+          const angle = (k * Math.PI) / 12,
+            x = Math.cos(angle) * radius * 72,
+            y = Math.sin(angle) * radius * 47,
+            box = { x0: x + l * scale, x1: x + r * scale, y0: y + t * scale, y1: y + b * scale },
+            base = { ...box, y0: Math.max(box.y0, y - BASE_BAND * scale) };
+          // Both feet on the island, clear of the square (drawn above props) and of each other.
+          if ((base.x0 / 70) ** 2 + (y / 45) ** 2 > 1 || (base.x1 / 70) ** 2 + (y / 45) ** 2 > 1)
+            continue;
+          if (rectGap({ x: 0, y: 0 }, base) < 24) continue;
+          if (placed.some((p) => overlaps(p.base, base, 2))) continue;
+          const clear = Math.min(30, ...streets.map((p) => rectGap(p, base)));
+          if (clear < STREET_GAP) continue;
+          // Landmarks lean north, behind the square; the low tree leans south.
+          const score = clear + (role === 'landmark' ? -y : role === 'tree' ? y : 0) * 0.2;
+          if (!pick || score > pick.score) pick = { role, x, y, scale, box, base, score, clear };
+        }
+      if (pick) placed.push(pick);
     }
-  candidates.sort((a, b) => b.score - a.score);
-  const picked = [];
-  for (const c of candidates)
-    if (
-      picked.length < 3 &&
-      c.clear >= PROP_CLEARANCE &&
-      picked.every((p) => Math.hypot(p.x - c.x, p.y - c.y) >= 30)
-    )
-      picked.push(c);
-  return picked.sort((a, b) => a.y - b.y);
+    if (!best || placed.length > best.length) best = placed;
+    if (placed.length === 3) break;
+  }
+  return best.sort((a, b) => a.y - b.y);
 }
-// The island's landmark, a house and a tree stand in the quarters between streets, never on
-// them. Tall things stand behind the square (north); the low tree takes the southernmost spot.
+const rectGap = (p, r) =>
+  Math.hypot(Math.max(r.x0 - p.x, 0, p.x - r.x1), Math.max(r.y0 - p.y, 0, p.y - r.y1));
+const overlaps = (a, b, pad) =>
+  a.x0 < b.x1 + pad && b.x0 < a.x1 + pad && a.y0 < b.y1 + pad && b.y0 < a.y1 + pad;
 export function islandProps(nodeId, i, geo, palette) {
-  return propSpots(nodeId, geo)
-    .map(({ x, y }, k) => {
-      if (k === 0 && landmarks[nodeId])
-        return `<g class="landmark" transform="translate(${x.toFixed(1)},${(y + 10).toFixed(1)}) scale(1.2)">${landmarks[nodeId](palette)}</g>`;
-      if (k === 2) return tree(x, y, palette);
-      const seed = i + k * 7,
-        { w, h } = footprint(seed);
-      return building(x - w / 2, y - h / 2 - 3, seed, palette);
+  return propSpots(nodeId, i, geo)
+    .map(({ role, x, y, scale }) => {
+      const at = `translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${scale})`;
+      if (role === 'landmark')
+        return `<g class="landmark" transform="${at} scale(1.2)">${landmarks[nodeId]?.(palette) ?? ''}</g>`;
+      return `<g transform="${at}">${role === 'tree' ? tree(palette) : house(i + 7, palette)}</g>`;
     })
     .join('');
 }
