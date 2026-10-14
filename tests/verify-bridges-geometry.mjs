@@ -4,6 +4,7 @@ import { allLevels } from '../src/content/levels.js';
 import { geometry } from '../src/render/geometry.js';
 import { beginTrace, advanceTrace } from '../src/input/bridge-trace.js';
 import { placeNames } from '../src/render/city.js';
+import { propSpots, PROP_CLEARANCE } from '../src/render/scenery.js';
 
 for (const portrait of [false, true]) {
   test(`Every built and candidate corridor clears unrelated waterfronts (${portrait ? 'portrait' : 'landscape'})`, () => {
@@ -137,4 +138,30 @@ test('A level keeps one name placement per layout, language and badge setting', 
     assert.notEqual(placeNames(level, geo, 'en', false), placeNames(level, geo, 'zh', false));
     assert.notEqual(placeNames(level, geo, 'en', false), placeNames(level, geo, 'en', true));
   }
+});
+test('Every island keeps its landmark, house and tree off its own streets', () => {
+  for (const level of allLevels)
+    for (const portrait of [false, true]) {
+      const geo = geometry(level, portrait);
+      for (const node of level.nodes) {
+        const o = geo.nodes[node.id],
+          spots = propSpots(node.id, geo),
+          where = `${level.id} ${portrait ? 'portrait' : 'landscape'} ${node.id}`;
+        assert.equal(spots.length, 3, where);
+        for (const curve of Object.values(geo.curves)) {
+          const end = curve.canonical.indexOf(node.id);
+          if (end < 0) continue;
+          // Densely, from the square out to this island's quay.
+          const quay = curve.ends[end].t;
+          for (let k = 0; k <= 200; k++) {
+            const p = curve.point(end ? 1 - ((1 - quay) * k) / 200 : (quay * k) / 200);
+            for (const spot of spots)
+              assert.ok(
+                Math.hypot(p.x - o.x - spot.x, p.y - o.y - spot.y) >= PROP_CLEARANCE - 1,
+                `${where}: a prop stands on a street`,
+              );
+          }
+        }
+      }
+    }
 });

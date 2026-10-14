@@ -68,45 +68,57 @@ const landmarks = {
   J: (p) =>
     `<path d="M-8 0h16l-3 -5h-10Z" fill="#7e776a"/><path d="M0 -5V-42" stroke="#5f6f74" stroke-width="2"/><path d="M1 -42l14 4l-14 4Z" fill="${p[2]}"/><circle class="beacon" cy="-44" r="3" fill="#ffe7a3"/>`,
 };
-// Directions on the island, in terrain-normalised space, that a street already uses.
-function streetAngles(nodeId, geo) {
+// Points along this island's own streets, from its square out to each quay, relative to the
+// square.
+function streetPoints(nodeId, geo) {
   const o = geo.nodes[nodeId],
-    angles = [];
+    points = [];
   for (const curve of Object.values(geo.curves)) {
     const end = curve.canonical.indexOf(nodeId);
     if (end < 0) continue;
     // How far along the curve, from this island's square, the quay is.
     const reach = end ? 1 - curve.ends[1].t : curve.ends[0].t;
-    for (let k = 0; k <= 12; k++) {
-      const t = (reach * k) / 12,
-        p = curve.point(end ? 1 - t : t),
-        dx = (p.x - o.x) / 72,
-        dy = (p.y - o.y) / 47;
-      if (Math.hypot(dx, dy) > 0.25) angles.push(Math.atan2(dy, dx));
+    for (let k = 0; k <= 24; k++) {
+      const t = (reach * k) / 24,
+        p = curve.point(end ? 1 - t : t);
+      points.push({ x: p.x - o.x, y: p.y - o.y });
     }
   }
-  return angles;
+  return points;
 }
-const turn = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-// The island's landmark, a house and a tree stand in the quarters between streets, never on
-// them. Coordinates are relative to the island's square.
-export function islandProps(nodeId, i, geo, palette) {
-  const streets = streetAngles(nodeId, geo);
-  const slots = Array.from({ length: 8 }, (_, k) => {
-    const angle = (k * Math.PI) / 4,
-      clear = streets.length ? Math.min(...streets.map((s) => turn(s, angle))) : Math.PI;
-    // The square sits in front of anything south of it; keep that quarter for open quay.
-    return { angle, score: clear - (Math.sin(angle) > 0.5 ? 0.5 : 0) };
-  }).sort((a, b) => b.score - a.score);
+// Room a prop needs from a street's centreline: its own half-width plus the 4.5 px half street.
+export const PROP_CLEARANCE = 14;
+// Where the island's three props stand, relative to its square, northernmost first: the spots
+// with the most room from the island's own streets, kept apart from each other, off the
+// square and inside the quay. Measured in pixels, so a crowded island still finds the gaps.
+export function propSpots(nodeId, geo) {
+  const streets = streetPoints(nodeId, geo),
+    candidates = [];
+  for (const r of [0.5, 0.6, 0.7])
+    for (let k = 0; k < 16; k++) {
+      const angle = (k * Math.PI) / 8,
+        x = Math.cos(angle) * r * 72,
+        y = Math.sin(angle) * r * 47;
+      if (Math.hypot(x, y) < 28) continue; // the square
+      const clear = Math.min(40, ...streets.map((p) => Math.hypot(p.x - x, p.y - y)));
+      // The square sits in front of anything south of it; keep that side for open quay.
+      candidates.push({ x, y, clear, score: clear - (Math.sin(angle) > 0.5 ? 6 : 0) });
+    }
+  candidates.sort((a, b) => b.score - a.score);
   const picked = [];
-  for (const minGap of [Math.PI / 2, Math.PI / 4])
-    for (const slot of slots)
-      if (picked.length < 3 && picked.every((p) => turn(p.angle, slot.angle) >= minGap))
-        picked.push(slot);
-  // Tall things stand behind the square (north); the low tree takes the southernmost spot.
-  return picked
-    .map((slot) => ({ x: Math.cos(slot.angle) * 0.6 * 72, y: Math.sin(slot.angle) * 0.6 * 47 }))
-    .sort((a, b) => a.y - b.y)
+  for (const c of candidates)
+    if (
+      picked.length < 3 &&
+      c.clear >= PROP_CLEARANCE &&
+      picked.every((p) => Math.hypot(p.x - c.x, p.y - c.y) >= 30)
+    )
+      picked.push(c);
+  return picked.sort((a, b) => a.y - b.y);
+}
+// The island's landmark, a house and a tree stand in the quarters between streets, never on
+// them. Tall things stand behind the square (north); the low tree takes the southernmost spot.
+export function islandProps(nodeId, i, geo, palette) {
+  return propSpots(nodeId, geo)
     .map(({ x, y }, k) => {
       if (k === 0 && landmarks[nodeId])
         return `<g class="landmark" transform="translate(${x.toFixed(1)},${(y + 10).toFixed(1)}) scale(1.2)">${landmarks[nodeId](palette)}</g>`;

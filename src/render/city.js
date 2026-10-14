@@ -56,6 +56,15 @@ function rectDistance(p, r) {
 // Put each island's name on the side of its quay that no bridge, island or other name uses.
 // The portrait map is drawn about half size on a phone, so its names are set larger.
 export const nameSize = (geo) => (geo.w === 720 ? 22 : 14);
+// An island's houses and landmark depend only on its level and layout; place them once.
+const placedProps = new WeakMap();
+function scenery(level, geo, nodeId, draw) {
+  const known = placedProps.get(level) ?? new Map(),
+    key = `${geo.w}|${nodeId}`;
+  placedProps.set(level, known);
+  if (!known.has(key)) known.set(key, draw());
+  return known.get(key);
+}
 // Placement depends only on the level, the layout, the language and the count badges, and it
 // is the costliest part of a scene, so each answer is kept rather than recomputed every step.
 const placements = new WeakMap();
@@ -245,7 +254,7 @@ export function citySVG(
     const { x, y } = geo.nodes[node.id];
     const selected = run.discoveryNodes?.includes(node.id),
       current = node.id === run.currentNode,
-      houses = islandProps(node.id, i, geo, palette);
+      houses = scenery(level, geo, node.id, () => islandProps(node.id, i, geo, palette));
     if (run.phase === 'complete')
       reflections += `<g transform="translate(${x},${y + 68}) scale(1,-.3)">${houses}</g>`;
     const seed = islandSeed(node.id),
