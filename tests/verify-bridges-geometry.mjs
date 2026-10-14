@@ -126,3 +126,15 @@ test('Every bridge lands on the quays of both its islands', () => {
       }
     }
 });
+test('A level keeps one name placement per layout, language and badge setting', () => {
+  const level = allLevels.find((l) => l.id === 'SB20');
+  for (const portrait of [false, true]) {
+    const geo = geometry(level, portrait);
+    assert.equal(
+      placeNames(level, geo, 'en', false),
+      placeNames(level, geometry(level, portrait), 'en', false),
+    );
+    assert.notEqual(placeNames(level, geo, 'en', false), placeNames(level, geo, 'zh', false));
+    assert.notEqual(placeNames(level, geo, 'en', false), placeNames(level, geo, 'en', true));
+  }
+});

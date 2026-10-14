@@ -742,7 +742,7 @@ try {
   const perfPage = performanceCase.page;
   await perfPage.goto(`${base}/?lang=en#SB22`);
   await scenario(
-    'Largest campaign and engineering maps fit 320px; model budget under CPU throttling',
+    'Largest campaign and engineering maps fit 320px; model and scene budgets under CPU throttling',
     async () => {
       await perfPage.setViewportSize({ width: 320, height: 740 });
       assert.equal(
@@ -797,6 +797,48 @@ try {
       });
       assert.ok(metrics.p95 < 8, JSON.stringify(metrics));
       await writeFile('test-results/model-performance.json', JSON.stringify(metrics, null, 2));
+      // Every step re-renders the scene; on a throttled phone layout that must stay cheap too.
+      const scene = await perfPage.evaluate(async () => {
+        const { allLevels } = await import('/src/content/levels.js');
+        const { newRun, move } = await import('/src/model/commands.js');
+        const { eulerRoute } = await import('/src/model/euler.js');
+        const { applyEdits, repairSolution } = await import('/src/model/repair.js');
+        const { geometry } = await import('/src/render/geometry.js');
+        const { citySVG } = await import('/src/render/city.js');
+        const times = [];
+        for (const l of allLevels.filter((l) => l.kind !== 'discovery')) {
+          const proof = l.kind === 'repair' ? repairSolution(l) : null,
+            graph = proof ? applyEdits(l, proof.ids).graph : l,
+            route =
+              proof?.route ??
+              eulerRoute(l, l.fixedStart, l.objective === 'return' ? l.fixedStart : l.fixedEnd);
+          let run = {
+            ...newRun(l),
+            phase: 'walking',
+            startNode: route.start,
+            currentNode: route.start,
+            history: [route.start],
+            draftEdits: proof?.ids ?? [],
+          };
+          // The first scene of a level settles its layout; the walk is what must stay fast.
+          citySVG(l, graph, run, geometry(l, true), { lang: 'en' });
+          for (const id of route.edges) {
+            run = move(graph, run, id).run;
+            const begin = performance.now();
+            citySVG(l, graph, run, geometry(l, true), { lang: 'en' });
+            times.push(performance.now() - begin);
+          }
+        }
+        times.sort((a, b) => a - b);
+        return {
+          samples: times.length,
+          p95: times[Math.floor(times.length * 0.95)],
+          max: times.at(-1),
+          cpuThrottle: 6,
+        };
+      });
+      assert.ok(scene.p95 < 25, JSON.stringify(scene));
+      await writeFile('test-results/scene-performance.json', JSON.stringify(scene, null, 2));
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     },
   );

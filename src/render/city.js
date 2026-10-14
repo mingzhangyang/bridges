@@ -56,7 +56,17 @@ function rectDistance(p, r) {
 // Put each island's name on the side of its quay that no bridge, island or other name uses.
 // The portrait map is drawn about half size on a phone, so its names are set larger.
 export const nameSize = (geo) => (geo.w === 720 ? 22 : 14);
+// Placement depends only on the level, the layout, the language and the count badges, and it
+// is the costliest part of a scene, so each answer is kept rather than recomputed every step.
+const placements = new WeakMap();
 export function placeNames(level, geo, lang, counts) {
+  const key = `${geo.w}|${lang}|${counts}`,
+    known = placements.get(level) ?? new Map();
+  placements.set(level, known);
+  if (!known.has(key)) known.set(key, placeNamesFresh(level, geo, lang, counts));
+  return known.get(key);
+}
+function placeNamesFresh(level, geo, lang, counts) {
   const size = nameSize(geo);
   const placed = {},
     // With bridge counts on, each island's count badge sits above it; names keep clear of it.
@@ -83,7 +93,11 @@ export function placeNames(level, geo, lang, counts) {
           y = o.y + dy + size * 0.32 - lead / 2,
           x0 = anchor === 'start' ? x : anchor === 'end' ? x - width : x - width / 2,
           box = { x0, x1: x0 + width, y0: y - size * 0.93, y1: y + lead + size * 0.29 };
-        let clear = Math.min(24, ...samples.map((p) => rectDistance(p, box) - 12));
+        // Only bridge points near the box can lower its (capped) clearance.
+        let clear = 24;
+        for (const p of samples)
+          if (p.x > box.x0 - 36 && p.x < box.x1 + 36 && p.y > box.y0 - 36 && p.y < box.y1 + 36)
+            clear = Math.min(clear, rectDistance(p, box) - 12);
         if (box.x0 < 6 || box.x1 > geo.w - 6 || box.y0 < 6 || box.y1 > geo.h - 6) clear -= 100;
         for (const other of level.nodes) {
           if (other.id === node.id) continue;
@@ -103,49 +117,69 @@ export function placeNames(level, geo, lang, counts) {
   }
   return placed;
 }
+const segmentCross = (p, q, r, s) => {
+  const d = (q.x - p.x) * (s.y - r.y) - (q.y - p.y) * (s.x - r.x);
+  if (!d) return null;
+  const u = ((r.x - p.x) * (s.y - r.y) - (r.y - p.y) * (s.x - r.x)) / d,
+    v = ((r.x - p.x) * (q.y - p.y) - (r.y - p.y) * (q.x - p.x)) / d;
+  return u >= 0 && u <= 1 && v >= 0 && v <= 1 ? [u, v] : null;
+};
+const bounds = (points) => ({
+  x0: Math.min(...points.map((p) => p.x)),
+  x1: Math.max(...points.map((p) => p.x)),
+  y0: Math.min(...points.map((p) => p.y)),
+  y1: Math.max(...points.map((p) => p.y)),
+});
+// Where two bridge curves cross, as [t on the first, t on the second]. Pure geometry, so each
+// pair is solved once per level and layout, however many steps the walk takes.
+const crossings = new WeakMap();
+function pairCrossings(level, geo, first, second) {
+  const byLevel = crossings.get(level) ?? new Map(),
+    key = `${geo.w}|${first}|${second}`;
+  crossings.set(level, byLevel);
+  if (byLevel.has(key)) return byLevel.get(key);
+  const s = geo.curves[first].samples,
+    r = geo.curves[second].samples,
+    a = bounds(s),
+    b = bounds(r),
+    hits = [];
+  if (a.x0 <= b.x1 && b.x0 <= a.x1 && a.y0 <= b.y1 && b.y0 <= a.y1)
+    for (let k = 1; k < s.length; k++)
+      for (let m = 1; m < r.length; m++) {
+        const hit = segmentCross(s[k - 1], s[k], r[m - 1], r[m]);
+        if (hit) hits.push([(k - 1 + hit[0]) / 64, (m - 1 + hit[1]) / 64]);
+      }
+  byLevel.set(key, hits);
+  return hits;
+}
 // Where one bridge passes over another, the upper one (drawn later, and the one a click there
 // reaches) casts a short, darker shadow on the deck below so the crossing reads as an
 // overpass rather than a junction.
-function crossingShadows(edges, geo, isGhost) {
+function crossingShadows(level, edges, geo, isGhost) {
   const shadows = {},
-    marked = {},
     spans = edges.map((edge) => {
       const curve = geo.curves[edge.id],
         [from, to] = curve.ends;
       return { edge, curve, from: from.t, to: to.t, ghost: isGhost(edge) };
     });
-  const cross = (p, q, r, s) => {
-    const d = (q.x - p.x) * (s.y - r.y) - (q.y - p.y) * (s.x - r.x);
-    if (!d) return null;
-    const u = ((r.x - p.x) * (s.y - r.y) - (r.y - p.y) * (s.x - r.x)) / d,
-      v = ((r.x - p.x) * (q.y - p.y) - (r.y - p.y) * (q.x - p.x)) / d;
-    return u >= 0 && u <= 1 && v >= 0 && v <= 1 ? u : null;
-  };
   for (const [j, upper] of spans.entries()) {
     if (upper.ghost) continue;
-    const s = upper.curve.samples;
+    const s = upper.curve.samples,
+      seen = [];
     let length = 0;
     for (let k = 1; k < s.length; k++)
       length += Math.hypot(s[k].x - s[k - 1].x, s[k].y - s[k - 1].y);
-    for (const lower of spans.slice(0, j)) {
-      const r = lower.curve.samples;
-      for (let k = 1; k < s.length; k++)
-        for (let m = 1; m < r.length; m++) {
-          const u = cross(s[k - 1], s[k], r[m - 1], r[m]);
-          if (u === null) continue;
-          const t = (k - 1 + u) / 64,
-            tl = (m - 1) / 64;
-          // Only crossings over open water: never at the shared island of two bridges.
-          if (t <= upper.from || t >= upper.to || tl <= lower.from || tl >= lower.to) continue;
-          const half = 30 / length,
-            seen = (marked[upper.edge.id] ??= []);
-          if (seen.some((prev) => Math.abs(prev - t) < half)) continue;
-          seen.push(t);
-          shadows[upper.edge.id] =
-            (shadows[upper.edge.id] ?? '') +
-            `<path class="crossing-shadow" d="${subPath(upper.curve, Math.max(upper.from, t - half), Math.min(upper.to, t + half))}" transform="translate(3,9)"/>`;
-        }
-    }
+    const half = 30 / length;
+    for (const lower of spans.slice(0, j))
+      for (const [t, tl] of pairCrossings(level, geo, upper.edge.id, lower.edge.id)) {
+        // Only crossings over open water: never at the shared island of two bridges.
+        if (t <= upper.from || t >= upper.to || tl <= lower.from || tl >= lower.to) continue;
+        if (seen.some((prev) => Math.abs(prev - t) < half)) continue;
+        seen.push(t);
+        shadows[upper.edge.id] =
+          (shadows[upper.edge.id] ?? '') +
+          `<path class="crossing-shadow" d="${subPath(upper.curve, Math.max(upper.from, t - half), Math.min(upper.to, t + half))}" transform="translate(3,9)"/>`;
+      }
   }
   return shadows;
 }
@@ -230,7 +264,7 @@ export function citySVG(
           : ` role="img" aria-label="${esc(label)}"`;
     labels += `<g class="node ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${action ? 'actionable' : ''}"${interactive ? ` data-node="${node.id}"` : ''}${a11y}><circle class="node-dot" cx="${x}" cy="${y}" r="22"/><circle class="node-hit" cx="${x}" cy="${y}" r="43" fill="transparent"/><text x="${x}" y="${y + (portrait ? 7 : 6)}" text-anchor="middle" class="node-letter">${node.id}</text><text x="${name.x}" y="${name.y}" text-anchor="${name.anchor}" class="land-name">${name.lines.map((line, k) => (k ? `<tspan x="${name.x}" dy="${name.lead}">${esc(line)}</tspan>` : esc(line))).join('')}</text>${counts ? `<g class="degree"><rect x="${x - 28}" y="${y - 80}" width="56" height="29" rx="14"/><text x="${x}" y="${y - 60}" text-anchor="middle">${'Ⅱ'.repeat(Math.floor(d[node.id] / 2))}${d[node.id] % 2 ? ' •' : ''} ${d[node.id]}</text></g>` : ''}</g>`;
   }
-  const shadows = crossingShadows(visible, geo, (edge) => {
+  const shadows = crossingShadows(level, visible, geo, (edge) => {
     const edit = planning && candidateFor(level, edge.id);
     return edit?.kind === 'add' && !built.includes(edit.id);
   });
