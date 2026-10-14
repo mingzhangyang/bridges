@@ -1,4 +1,18 @@
 import { cityLayout } from './layouts.js';
+// The quay line where a bridge deck meets its island, a little inside the 72 × 47 terrain top.
+export const SHORE = { rx: 66, ry: 42 };
+const inside = (p, o) => ((p.x - o.x) / SHORE.rx) ** 2 + ((p.y - o.y) / SHORE.ry) ** 2 < 1;
+// The parameter where a curve crosses the quay of the island it starts (or ends) at.
+function landfall(point, origin, fromEnd) {
+  let lo = 0,
+    hi = 0.5;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (inside(point(fromEnd ? 1 - mid : mid), origin)) lo = mid;
+    else hi = mid;
+  }
+  return fromEnd ? 1 - hi : hi;
+}
 export function geometry(level, portrait = false) {
   const w = portrait ? 720 : 1100,
     h = portrait ? 820 : 670;
@@ -32,6 +46,16 @@ export function geometry(level, portrait = false) {
       y: (1 - t) ** 2 * a.y + 2 * (1 - t) * t * c.y + t * t * b.y,
     });
     const samples = Array.from({ length: 65 }, (_, i) => point(i / 64));
+    // Abutments: where the deck leaves the quay, with the outward direction of travel.
+    const ends = [
+      [a, false],
+      [b, true],
+    ].map(([origin, fromEnd]) => {
+      const t = landfall(point, origin, fromEnd),
+        p = point(t),
+        q = point(fromEnd ? t - 0.01 : t + 0.01);
+      return { t, x: p.x, y: p.y, angle: Math.atan2(q.y - p.y, q.x - p.x) };
+    });
     curves[edge.id] = {
       a,
       b,
@@ -39,6 +63,7 @@ export function geometry(level, portrait = false) {
       canonical,
       point,
       samples,
+      ends,
       path: `M${a.x},${a.y} Q${c.x},${c.y} ${b.x},${b.y}`,
     };
   }
