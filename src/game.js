@@ -34,6 +34,7 @@ import { hint } from './services/hints.js';
 import { postcardBlob, downloadBlob } from './services/export.js';
 import { geometry } from './render/geometry.js';
 import { citySVG } from './render/city.js';
+import { commissionStamp } from './render/stamps.js';
 import { bridgeLabel, bridgeName, placeLabel } from './render/labels.js';
 import { escape } from './render/escape.js';
 import { pairingDiagram } from './render/pairing.js';
@@ -440,7 +441,7 @@ export function startGame() {
       const proof = repairSolution(level);
       optimal = proof && proof.cost === applyEdits(level, run.finalEditSet).cost;
     }
-    banner.innerHTML = `<div><strong>${escape(stamp)}</strong><small>${optimal ? tr('optimal') : nm(level.title)}</small></div><button class="primary" id="next-level">${tr('next')} →</button>`;
+    banner.innerHTML = `${commissionStamp(level.id)}<div class="completion-copy"><strong>${escape(stamp)}</strong><small>${optimal ? tr('optimal') : nm(level.title)}</small></div><button class="primary" id="next-level">${tr('next')} →</button>`;
     $('next-level').onclick = () => {
       if (dailyMode()) {
         openAtlas();
@@ -674,7 +675,7 @@ export function startGame() {
   function levelCard(l, disabled = false) {
     const completion = snapshot.completions[l.id] ?? snapshot.discoveries[l.id];
     const done = completion?.independent || completion?.assisted;
-    return `<button class="level-card" data-action="level:${l.id}" ${disabled ? 'disabled' : ''}><strong>${l.id.slice(2)}${done ? ' · ✓' : ''}</strong>${escape(nm(l.title))}<small>${done ? `<br>${completion.independent ? tr('independent') : tr('assisted')}` : ''}${snapshot.runs[l.id]?.walkedEdgeIds?.length && !done ? `<br>${tr('resume')}` : ''}</small></button>`;
+    return `<button class="level-card ${l.id.startsWith('EC') ? 'commission-card' : ''}" data-action="level:${l.id}" ${disabled ? 'disabled' : ''}>${commissionStamp(l.id)}<strong>${l.id.slice(2)}${done ? ' · ✓' : ''}</strong>${escape(nm(l.title))}<small>${done ? `<br>${completion.independent ? tr('independent') : tr('assisted')}` : ''}${snapshot.runs[l.id]?.walkedEdgeIds?.length && !done ? `<br>${tr('resume')}` : ''}</small></button>`;
   }
   function openAtlas(tab = 'main') {
     motion.cancel();
@@ -713,7 +714,7 @@ export function startGame() {
         .map(([k, r]) => {
           const l = resolveKey(k);
           return l
-            ? `<button class="level-card" data-action="postcard:${escape(k)}"><span class="stamp">${l.id.startsWith('EC') ? l.id.slice(2) : '⌒'}</span>${escape(nm(l.title))}<small><br>${escape(k.startsWith('daily:') ? k.split(':')[1] : l.id)}</small></button>`
+            ? `<button class="level-card" data-action="postcard:${escape(k)}">${commissionStamp(l.id) || '<span class="stamp">⌒</span>'}${escape(nm(l.title))}<small><br>${escape(k.startsWith('daily:') ? k.split(':')[1] : l.id)}</small></button>`
             : '';
         })
         .join('')}</div>`;

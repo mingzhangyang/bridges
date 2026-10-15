@@ -87,6 +87,28 @@ async function keyBridge(page, id) {
   await page.keyboard.press('Enter');
   await page.waitForTimeout(15);
 }
+// Keep the competing key intents in one browser task. Separate automation round trips
+// can outlast a 330 ms crossing on a busy runner and accidentally test three slow walks.
+// Native keyboard navigation is independently exercised across every playable level.
+async function keyBurst(page, ids, background = false) {
+  return page.evaluate(
+    ({ ids, background }) => {
+      for (const id of ids) {
+        const bridge = document.querySelector(`[data-bridge="${id}"]`);
+        bridge.focus();
+        bridge.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+        );
+      }
+      if (background) {
+        Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }
+      return document.querySelector('#progress-number').textContent;
+    },
+    { ids, background },
+  );
+}
 async function scenePoint(page, id, t = 0.5) {
   return page.evaluate(
     async ({ id, t }) => {
@@ -684,18 +706,11 @@ try {
   await scenario(
     'Animation has one buffered intent; undo and background cancel pending moves',
     async () => {
-      await keyBridge(motionPage, 'b1');
-      await keyBridge(motionPage, 'b2');
-      await keyBridge(motionPage, 'b3');
+      assert.equal(await keyBurst(motionPage, ['b1', 'b2', 'b3']), '1 / 3');
       await motionPage.waitForTimeout(800);
       assert.equal(await motionPage.locator('#progress-number').textContent(), '1 / 3');
       await motionPage.locator('#undo-button').click();
-      await keyBridge(motionPage, 'b1');
-      await keyBridge(motionPage, 'b2');
-      await motionPage.evaluate(() => {
-        Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
+      assert.equal(await keyBurst(motionPage, ['b1', 'b2'], true), '1 / 3');
       await motionPage.waitForTimeout(400);
       await motionPage.evaluate(() => {
         Object.defineProperty(document, 'hidden', { configurable: true, value: false });

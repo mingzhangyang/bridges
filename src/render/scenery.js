@@ -109,6 +109,12 @@ function streetPoints(nodeId, geo) {
 // pixel of air. Taller parts may hide a street behind them, as anything upright would.
 export const STREET_GAP = 5.5;
 const BASE_BAND = 14;
+// Full resting silhouette, including the hat, satchel and the top of the idle bob.
+// Reserve it on every island, so scenery never jumps when the messenger arrives.
+export const TRAVELER_SILHOUETTE = [
+  { x0: -15, x1: 17, y0: -49, y1: -20 },
+  { x0: -14, x1: 25, y0: -20, y1: 14 },
+];
 // The island's three props in drawing order (north first): its landmark, a house and a tree,
 // each with its base point, scale and drawn box, relative to the island's square. Each
 // island uses the largest scale at which all three stand clear of its own streets.
@@ -124,7 +130,7 @@ export function propSpots(nodeId, i, geo) {
     const placed = [];
     for (const [role, [l, r, t, b]] of roles) {
       let pick = null;
-      for (const radius of [0.35, 0.45, 0.55, 0.65, 0.75])
+      for (const radius of [0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85])
         for (let k = 0; k < 24; k++) {
           const angle = (k * Math.PI) / 12,
             x = Math.cos(angle) * radius * 72,
@@ -135,6 +141,7 @@ export function propSpots(nodeId, i, geo) {
           if ((base.x0 / 70) ** 2 + (y / 45) ** 2 > 1 || (base.x1 / 70) ** 2 + (y / 45) ** 2 > 1)
             continue;
           if (rectGap({ x: 0, y: 0 }, base) < 24) continue;
+          if (TRAVELER_SILHOUETTE.some((part) => overlaps(box, part, 2))) continue;
           if (placed.some((p) => overlaps(p.base, base, 2))) continue;
           const clear = Math.min(30, ...streets.map((p) => rectGap(p, base)));
           if (clear < STREET_GAP) continue;
