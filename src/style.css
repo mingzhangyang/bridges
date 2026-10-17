@@ -79,7 +79,7 @@ button.primary:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 102px;
+  height: 80px;
   border-bottom: 1px solid var(--line);
 }
 .brand {
@@ -147,7 +147,7 @@ nav button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 44px 0 34px;
+  margin: 26px 0 24px;
 }
 .eyebrow {
   font-size: 11px;
@@ -195,9 +195,13 @@ h1 {
 .journey-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 36px;
+  gap: 0 36px;
+  grid-template-areas: 'map journal' 'controls journal';
+  grid-template-rows: min-content 1fr;
+  align-items: start;
 }
 .map-panel {
+  grid-area: map;
   position: relative;
   border-radius: 12px;
   overflow: hidden;
@@ -205,6 +209,9 @@ h1 {
   border: 1px solid #b8cdd0;
   display: flex;
   flex-direction: column;
+}
+.map-panel:has(#complete-banner:not([hidden])) {
+  --completion-space: 86px;
 }
 .map-topline,
 .map-bottomline {
@@ -221,12 +228,19 @@ h1 {
   border-bottom: 1px solid #fff4;
 }
 .map-bottomline {
+  gap: 8px;
   padding-top: 14px;
   padding-bottom: 18px;
 }
 .map-bottomline > span:nth-child(2) {
   letter-spacing: 0;
   font-size: 12px;
+  text-align: center;
+}
+.map-bottomline > span:first-child,
+.compass {
+  flex: none;
+  white-space: nowrap;
 }
 .stage {
   flex: 1;
@@ -241,7 +255,7 @@ h1 {
 .city-scene {
   display: block;
   width: 100%;
-  max-height: 600px;
+  height: clamp(180px, calc(100dvh - 440px - var(--completion-space, 0px)), 600px);
   overflow: visible;
 }
 .terrain,
@@ -332,9 +346,9 @@ h1 {
 }
 .bridge-shadow {
   fill: none;
-  stroke: #3b6775;
+  stroke: var(--bridge-shadow-color, #3b6775);
   stroke-width: 25;
-  opacity: 0.18;
+  opacity: var(--bridge-shadow-opacity, 0.18);
   pointer-events: none;
 }
 .bridge-rail {
@@ -348,13 +362,7 @@ h1 {
   stroke-width: 14;
   pointer-events: none;
 }
-.bridge-grain {
-  fill: none;
-  stroke: #f7e8c6;
-  stroke-width: 1.5;
-  stroke-dasharray: 2 8;
-  pointer-events: none;
-}
+
 .bridge-hit {
   fill: none;
   stroke: transparent;
@@ -397,7 +405,7 @@ h1 {
 }
 .bridge.ghost .bridge-rail,
 .bridge.ghost .bridge-shadow,
-.bridge.ghost .bridge-grain {
+.bridge.ghost .material-detail {
   opacity: 0;
 }
 .bridge.removed {
@@ -521,7 +529,7 @@ h1 {
 }
 .graph-view .bridge-shadow,
 .graph-view .crossing-shadow,
-.graph-view .bridge-grain,
+.graph-view .material-detail,
 .graph-view .abutments,
 .graph-view .lamps {
   opacity: 0;
@@ -560,6 +568,7 @@ h1 {
   background: #9bc1cf;
 }
 .journal {
+  grid-area: journal;
   padding: 12px 0;
   display: flex;
   flex-direction: column;
@@ -652,10 +661,11 @@ h1 {
   margin-bottom: 8px;
 }
 .toolbar {
+  grid-area: controls;
   display: flex;
   gap: 12px;
-  max-width: calc(100% - 316px);
-  margin: 20px 0 30px;
+  min-width: 0;
+  margin: 12px 0 20px;
 }
 .toolbar button {
   display: flex;
@@ -688,10 +698,9 @@ footer a:hover {
   text-decoration: underline;
 }
 #complete-banner {
-  position: absolute;
-  bottom: 62px;
-  left: 20px;
-  right: 20px;
+  position: relative;
+  flex: none;
+  margin: 0 12px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -957,10 +966,10 @@ dialog::backdrop {
   }
   .journey-layout {
     grid-template-columns: minmax(0, 1fr) 230px;
-    gap: 24px;
+    gap: 0 24px;
   }
   .toolbar {
-    max-width: calc(100% - 254px);
+    min-width: 0;
   }
   .brand-en {
     display: none;
@@ -984,6 +993,18 @@ dialog::backdrop {
     font-size: 16px;
     gap: 7px;
     letter-spacing: 1px;
+  }
+  :lang(en) .brand {
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    gap: 6px;
+  }
+  :lang(en) #brand-title {
+    white-space: nowrap;
+  }
+  :lang(en) nav button {
+    font-size: 10px;
+    padding: 6px;
   }
   .brand-mark {
     width: 34px;
@@ -1033,8 +1054,10 @@ dialog::backdrop {
     letter-spacing: 0;
   }
   .journey-layout {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'map' 'journal' 'controls';
+    grid-template-rows: auto auto auto;
     gap: 16px;
   }
   .map-topline,
@@ -1047,6 +1070,7 @@ dialog::backdrop {
     font-size: 11px;
   }
   .city-scene {
+    height: auto;
     max-height: 70dvh;
     min-height: 350px;
   }
@@ -1146,9 +1170,7 @@ dialog::backdrop {
     display: none;
   }
   #complete-banner {
-    bottom: 44px;
-    left: 10px;
-    right: 10px;
+    margin: 0 10px 10px;
     padding: 12px;
   }
   #complete-banner strong {
@@ -1182,10 +1204,14 @@ dialog::backdrop {
     margin-top: 18px;
   }
   .city-scene {
-    max-height: 66dvh;
+    height: max(120px, calc(100dvh - 200px - var(--completion-space, 0px)));
+    min-height: 0;
   }
   .journal {
     padding: 0;
+  }
+  #complete-banner {
+    padding: 8px 12px;
   }
   .journal .progress,
   .route-journal {
@@ -1261,9 +1287,9 @@ dialog::backdrop {
 .atmosphere-4 .node-letter {
   fill: #486573;
 }
-.atmosphere-4 .bridge-shadow {
-  stroke: #101d30;
-  opacity: 0.4;
+.atmosphere-4 {
+  --bridge-shadow-color: #101d30;
+  --bridge-shadow-opacity: 0.4;
 }
 .atmosphere-4 .bridge-deck {
   filter: brightness(1.05);
@@ -1274,6 +1300,7 @@ dialog::backdrop {
   pointer-events: none;
 }
 .replay-scene svg {
+  height: auto;
   max-height: 380px;
 }
 .replay-slider {
@@ -1364,6 +1391,7 @@ dialog::backdrop {
   overflow: hidden;
 }
 .pairing-diagram .city-scene {
+  height: auto;
   max-height: 48dvh;
   min-height: 0;
 }
@@ -1415,5 +1443,60 @@ dialog::backdrop {
   }
   to {
     opacity: 1;
+  }
+}
+
+/* The same engraved commission identity appears in the atlas, collection and result. */
+.commission-stamp {
+  display: inline-block;
+  width: 54px;
+  height: 54px;
+  flex: none;
+  fill: none;
+  stroke: var(--gold-text);
+  stroke-width: 1.4;
+  vertical-align: middle;
+}
+.stamp-perforation {
+  stroke-dasharray: 1 3;
+}
+.stamp-emblem {
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.level-card .commission-stamp {
+  float: right;
+  margin: 0 0 6px 8px;
+}
+.commission-card .commission-stamp {
+  float: none;
+  display: block;
+  margin: 0 0 8px;
+}
+.completion-copy {
+  overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 0;
+}
+#complete-banner button {
+  flex: none;
+}
+@media (max-width: 380px) {
+  #complete-banner {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+  #complete-banner .completion-copy,
+  #complete-banner button {
+    grid-column: 1 / -1;
+  }
+  #complete-banner .commission-stamp + .completion-copy {
+    grid-column: 2;
+  }
+  #complete-banner .commission-stamp {
+    grid-row: 1;
+    width: 38px;
+    height: 38px;
   }
 }

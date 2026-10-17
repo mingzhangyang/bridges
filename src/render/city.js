@@ -3,6 +3,7 @@ import { bridgeAction, candidateFor, nodeAction, visibleEdges } from '../model/i
 import { bridgeLabel, nodeLabel } from './labels.js';
 import { escape as esc } from './escape.js';
 import { SHORE } from './geometry.js';
+import { bridgeSurface } from './materials.js';
 import { islandProps, islandSeed, shorePath } from './scenery.js';
 const waters = [
   ['#d4e7e7', '#86b5c2'],
@@ -304,7 +305,7 @@ export function citySVG(
         : '';
     if (!ghost)
       streets += `<path class="street ${walked ? 'walked' : ''} ${removed ? 'removed' : ''}" d="${curve.path}"/>`;
-    bridges += `<g class="bridge ${walked ? 'walked' : ''} ${action === 'walk' ? 'available' : ''} ${action ? 'actionable' : ''} ${ghost ? 'ghost' : ''} ${removed ? 'removed' : ''} ${hinted ? 'hinted' : ''} ${riskId === edge.id ? 'risk' : ''}"${interactive ? ` data-bridge="${edge.id}"` : ''}${a11y}><g class="span" mask="url(#quay-${uid})"><path class="bridge-halo" d="${curve.path}"/><path class="bridge-shadow" d="${curve.path}" transform="translate(3,9)"/>${shadows[edge.id] ?? ''}<path class="bridge-rail" d="${curve.path}"/><path class="bridge-deck" d="${curve.path}" stroke="${color}"/><path class="bridge-grain" d="${curve.path}"/></g><g class="abutments">${abutments(curve)}</g>${lamps ? `<g class="lamps">${lamps}</g>` : ''}${ghost ? `<text x="${curve.point(0.5).x}" y="${curve.point(0.5).y + 5}" class="slot-label">+</text>` : ''}<path class="bridge-hit" d="${curve.path}" style="stroke-width:${geo.w === 720 ? 88 : 48}"/></g>`;
+    bridges += `<g class="bridge ${walked ? 'walked' : ''} ${action === 'walk' ? 'available' : ''} ${action ? 'actionable' : ''} ${ghost ? 'ghost' : ''} ${removed ? 'removed' : ''} ${hinted ? 'hinted' : ''} ${riskId === edge.id ? 'risk' : ''}"${interactive ? ` data-bridge="${edge.id}"` : ''}${a11y}><g class="span" mask="url(#quay-${uid})"><path class="bridge-halo" d="${curve.path}"/><path class="bridge-shadow" d="${curve.path}" transform="translate(3,9)"/>${shadows[edge.id] ?? ''}<path class="bridge-rail" d="${curve.path}"/><path class="bridge-deck" d="${curve.path}" stroke="${color}"/>${bridgeSurface(curve, edge.material)}</g><g class="abutments">${abutments(curve)}</g>${lamps ? `<g class="lamps">${lamps}</g>` : ''}${ghost ? `<text x="${curve.point(0.5).x}" y="${curve.point(0.5).y + 5}" class="slot-label">+</text>` : ''}<path class="bridge-hit" d="${curve.path}" style="stroke-width:${geo.w === 720 ? 88 : 48}"/></g>`;
   }
   const pos = geo.nodes[run.currentNode] ?? { x: -100, y: -100 },
     { w, h } = geo,

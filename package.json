@@ -10,9 +10,10 @@
     "dev": "node tools/serve.mjs",
     "build": "node tools/generators/bridges-build.mjs",
     "test": "node --test tests/verify-bridges-*.mjs",
-    "test:browser": "node tests/smoke-bridges.mjs",
+    "test:browser": "node tests/art-bridges.mjs && node tests/smoke-bridges.mjs",
     "check": "npm run format:check && node tools/check.mjs && npm test && npm run build",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build:og": "node tools/generators/og-build.mjs"
   },
   "devDependencies": {
     "playwright": "1.58.2",

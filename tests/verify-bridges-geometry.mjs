@@ -4,7 +4,7 @@ import { allLevels } from '../src/content/levels.js';
 import { geometry } from '../src/render/geometry.js';
 import { beginTrace, advanceTrace } from '../src/input/bridge-trace.js';
 import { placeNames } from '../src/render/city.js';
-import { propSpots } from '../src/render/scenery.js';
+import { propSpots, TRAVELER_SILHOUETTE } from '../src/render/scenery.js';
 
 for (const portrait of [false, true]) {
   test(`Every built and candidate corridor clears unrelated waterfronts (${portrait ? 'portrait' : 'landscape'})`, () => {
@@ -148,7 +148,17 @@ test('Every island keeps its landmark, house and tree standing clear of its own 
           spots = propSpots(node.id, i, geo),
           where = `${level.id} ${portrait ? 'portrait' : 'landscape'} ${node.id}`;
         assert.deepEqual(spots.map((s) => s.role).sort(), ['house', 'landmark', 'tree'], where);
-        for (const spot of spots) assert.ok(spot.scale >= 0.7, `${where}: ${spot.role} too small`);
+        for (const spot of spots) {
+          assert.ok(spot.scale >= 0.7, `${where}: ${spot.role} too small`);
+          for (const body of TRAVELER_SILHOUETTE)
+            assert.ok(
+              spot.box.x1 + 2 <= body.x0 ||
+                body.x1 + 2 <= spot.box.x0 ||
+                spot.box.y1 + 2 <= body.y0 ||
+                body.y1 + 2 <= spot.box.y0,
+              `${where}: ${spot.role} overlaps the messenger silhouette`,
+            );
+        }
         for (const [k, a] of spots.entries())
           for (const b of spots.slice(k + 1))
             assert.ok(

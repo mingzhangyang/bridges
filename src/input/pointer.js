@@ -81,7 +81,10 @@ export function attachPointer(stage, state, submit, selectNode, choose) {
       return;
     }
     const svg = stage.querySelector('svg'),
-      radius = (22 * geo.w) / svg.getBoundingClientRect().width;
+      // The SVG viewport can be letterboxed when height limits the scene. Its
+      // screen transform includes that fitted scale, unlike the element width.
+      matrix = svg.getScreenCTM(),
+      radius = 22 / Math.hypot(matrix.a, matrix.b);
     const found = hits(p, geo, graph.edges, radius),
       open = found.filter((e) => actionable(e.id));
     // Only bridges that can be acted on compete for an overlapping tap; with none, the first hit
