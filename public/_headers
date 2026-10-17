@@ -2,5 +2,5 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://games.orangely.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://games-analytics.orangely.workers.dev; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
   Cache-Control: public, max-age=0, must-revalidate

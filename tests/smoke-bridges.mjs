@@ -190,6 +190,43 @@ async function assertTextContrast(page, pairs) {
     assert.ok(ratio >= 4.5, `${foreground} on ${background}: ${ratio.toFixed(2)}:1`);
 }
 try {
+  await scenario('Analytics counts only genuine attempts and completions', async () => {
+    const { page, context } = await pageFor();
+    await page.addInitScript(() => {
+      window.__telemetryEvents = [];
+      window.hubTrack = (game, event) => window.__telemetryEvents.push({ game, event });
+    });
+    await page.goto(base);
+    await page.waitForSelector('[data-bridge]');
+    const inspect = () =>
+      page.evaluate(() => ({
+        events: window.__telemetryEvents.map((e) => e.event),
+        playing: window.__gamesAnalyticsPlaying.get('bridges')(),
+      }));
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+    await page.click('#settings-button');
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+    await page.click('#dialog-close');
+
+    await keyBridge(page, 'b1');
+    assert.deepEqual(await inspect(), { events: ['play'], playing: true });
+    await page.click('#restart-button');
+    assert.deepEqual(await inspect(), { events: ['play'], playing: false });
+
+    const level = getLevel('SB01');
+    const route = eulerRoute(level, level.fixedStart);
+    for (const id of route.edges) await keyBridge(page, id);
+    assert.equal(await page.locator('#complete-banner').isVisible(), true);
+    assert.deepEqual(await inspect(), {
+      events: ['play', 'play', 'finish'],
+      playing: false,
+    });
+    // Restore a completed run: drawing an existing seal must not send play/finish.
+    await page.reload();
+    await page.waitForSelector('#complete-banner:not([hidden])');
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+    await context.close();
+  });
   await scenario(
     'One held drag crosses consecutive bridges with normal and reduced motion',
     async () => {
