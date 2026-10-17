@@ -35,6 +35,92 @@ try {
       ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
       : {}),
   });
+  // Validate the reservation against the real sprite, independently of prop placement.
+  const probe = await browser.newPage({
+    viewport: { width: 1200, height: 800 },
+    reducedMotion: 'reduce',
+  });
+  await probe.goto(`${base}/?lang=en#SB01`);
+  await probe.locator('#stage .traveler-bob').waitFor();
+  const uncovered = await probe.evaluate(async () => {
+    const { TRAVELER_SILHOUETTE } = await import('/src/render/scenery.js');
+    const traveler = document.querySelector('#stage .traveler');
+    const missed = [];
+    for (const shape of traveler.querySelectorAll('.traveler-bob path, .traveler-bob circle')) {
+      const box = shape.getBBox();
+      const matrix = traveler.getCTM().inverse().multiply(shape.getCTM());
+      // Sample each rendered part's extent throughout the idle bob, including feet.
+      for (let x = 0; x <= 8; x++)
+        for (let y = 0; y <= 8; y++) {
+          const p = new DOMPoint(
+            box.x + (box.width * x) / 8,
+            box.y + (box.height * y) / 8,
+          ).matrixTransform(matrix);
+          for (const bob of [0, -2.5])
+            if (
+              !TRAVELER_SILHOUETTE.some(
+                (r) => p.x >= r.x0 && p.x <= r.x1 && p.y + bob >= r.y0 && p.y + bob <= r.y1,
+              )
+            )
+              missed.push({ x: p.x, y: p.y + bob });
+        }
+    }
+    return missed;
+  });
+  assert.deepEqual(uncovered, [], 'Reservation must cover the rendered messenger, including feet');
+  // Exercise real pointer capture on a deliberately height-limited, letterboxed SVG.
+  const target = await probe.evaluate(async () => {
+    const { attachPointer } = await import('/src/input/pointer.js');
+    document.body.innerHTML =
+      '<div id="pointer-probe"><svg viewBox="0 0 1000 600" style="width:1000px;height:120px;display:block"><path d="M200 300H800" stroke="black"/></svg></div>';
+    const stage = document.querySelector('#pointer-probe');
+    const edge = { id: 'test', u: 'A', v: 'B' };
+    window.pointerSubmissions = [];
+    attachPointer(
+      stage,
+      () => ({
+        geo: {
+          w: 1000,
+          h: 600,
+          nodes: {},
+          curves: {
+            test: {
+              samples: [
+                { x: 200, y: 300 },
+                { x: 800, y: 300 },
+              ],
+            },
+          },
+        },
+        graph: { edges: [edge] },
+        canSelectNode: () => false,
+        actionable: () => true,
+        locked: false,
+      }),
+      (id) => window.pointerSubmissions.push(id),
+      () => {},
+      () => {},
+    );
+    const svg = stage.querySelector('svg');
+    const matrix = svg.getScreenCTM();
+    const p = new DOMPoint(500, 300).matrixTransform(matrix);
+    return {
+      x: p.x,
+      y: p.y,
+      scale: Math.hypot(matrix.a, matrix.b),
+      width: svg.getBoundingClientRect().width,
+    };
+  });
+  assert.ok(target.scale < target.width / 1000, 'Fixture must be height-limited');
+  await probe.mouse.click(target.x, target.y + 20);
+  assert.deepEqual(await probe.evaluate(() => window.pointerSubmissions), ['test']);
+  await probe.mouse.click(target.x, target.y + 24);
+  assert.deepEqual(
+    await probe.evaluate(() => window.pointerSubmissions),
+    ['test'],
+    'Outside 22px must miss',
+  );
+  await probe.close();
   await mkdir('test-results/art', { recursive: true });
   for (const [width, height] of [
     [1440, 1000],

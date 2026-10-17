@@ -113,7 +113,8 @@ const BASE_BAND = 14;
 // Reserve it on every island, so scenery never jumps when the messenger arrives.
 export const TRAVELER_SILHOUETTE = [
   { x0: -15, x1: 17, y0: -49, y1: -20 },
-  { x0: -14, x1: 25, y0: -20, y1: 14 },
+  { x0: -14, x1: 26, y0: -20, y1: 14 },
+  { x0: -8, x1: 12, y0: 10, y1: 22 },
 ];
 // The island's three props in drawing order (north first): its landmark, a house and a tree,
 // each with its base point, scale and drawn box, relative to the island's square. Each
