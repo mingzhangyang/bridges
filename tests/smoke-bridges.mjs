@@ -255,8 +255,7 @@ try {
     for (const id of ['A', 'B', 'C', 'D']) {
       await page.locator(`[data-node="${id}"]`).focus();
       await page.keyboard.press('Enter');
-      if (id === 'A')
-        assert.deepEqual(await inspect(), { events: ['play'], playing: true });
+      if (id === 'A') assert.deepEqual(await inspect(), { events: ['play'], playing: true });
     }
     await page.click('#explain-discovery');
     assert.deepEqual(await inspect(), { events: ['play'], playing: false });
