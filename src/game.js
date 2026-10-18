@@ -29,6 +29,7 @@ import {
   chapterUnlocked as isChapterUnlocked,
 } from './services/progress.js';
 import { initialSettings } from './services/settings.js';
+import { createAnalytics } from './services/analytics.js';
 import { dailyEntry, dailyHash } from './services/daily.js';
 import { hint } from './services/hints.js';
 import { postcardBlob, downloadBlob } from './services/export.js';
@@ -65,6 +66,21 @@ export function startGame() {
   const tr = (k) => t(settings.lang, k),
     nm = (p) => name(settings.lang, p);
   const dailyMode = () => key?.startsWith('daily:');
+  let analyticsStarted = false;
+  const analytics = createAnalytics(
+    'bridges',
+    () => analyticsStarted && !!run && run.phase !== 'complete' && !$('dialog').open,
+  );
+  function beginAttempt() {
+    if (analyticsStarted) return;
+    analyticsStarted = true;
+    analytics.play();
+  }
+  function finishAttempt() {
+    if (!analyticsStarted) return;
+    analytics.finish();
+    analyticsStarted = false;
+  }
   const motion = motionController((next) => {
     if (next && !document.hidden) submit(next);
   });
@@ -102,6 +118,7 @@ export function startGame() {
   }
   function select(l, k = l.id, entry = null) {
     if (run) save();
+    analyticsStarted = false;
     sound.suspend();
     motion.cancel();
     cancelPointer();
@@ -276,6 +293,7 @@ export function startGame() {
         try {
           const confirmed = confirmBlueprint(level, run);
           run = confirmed;
+          beginAttempt();
           message = tr('built');
           save();
           render();
@@ -294,6 +312,7 @@ export function startGame() {
             motion.cancel();
             cancelPointer();
             run = { ...newRun(level, run.assistance), draftEdits: [...run.finalEditSet] };
+            analyticsStarted = false;
             message = '';
             save();
             closeDialog();
@@ -320,6 +339,7 @@ export function startGame() {
       return;
     }
     run = { ...run, draftEdits: proposed, editHistory: [...run.editHistory, [...run.draftEdits]] };
+    beginAttempt();
     message = '';
     save();
     render();
@@ -335,6 +355,8 @@ export function startGame() {
     $('begin-discovery').onclick = () => {
       motion.cancel();
       run = { ...run, phase: 'discovery' };
+      // Opening the discovery view (including via Hint) is not a gameplay action.
+      // The first island selection starts the attempt in selectNode().
       view = 'graph';
       message = '';
       save();
@@ -367,9 +389,11 @@ export function startGame() {
               return;
             }
             if (action !== 'understand') return;
+            beginAttempt();
             run = { ...run, phase: 'complete', explained: true };
             closeDialog();
             complete();
+            finishAttempt();
             render();
           },
         );
@@ -487,10 +511,12 @@ export function startGame() {
     }
     // Hints escalate while the player is stuck; any progress starts them over.
     run = { ...result.run, hintTier: 0 };
+    beginAttempt();
     message = '';
     highlight = [];
     hintResult = null;
     if (!complete()) save();
+    if (run.phase === 'complete') finishAttempt();
     render();
     if (run.phase === 'complete' && document.activeElement?.closest('[data-bridge]'))
       $('next-level')?.focus({ preventScroll: true });
@@ -529,6 +555,7 @@ export function startGame() {
       run = chooseStart(level, run, id);
       message = '';
     }
+    beginAttempt();
     save();
     render();
   }
@@ -567,6 +594,7 @@ export function startGame() {
   );
   attachKeyboard($('stage'), submit, selectNode, () => actionableBridges(level, graph(), run));
   $('undo-button').onclick = () => {
+    const completed = run.phase === 'complete';
     sound.suspend();
     motion.cancel();
     cancelPointer();
@@ -578,6 +606,9 @@ export function startGame() {
           editHistory: run.editHistory.slice(0, -1),
         };
     } else run = { ...undo(run), hintTier: 0 };
+    // Undoing a finished walk reopens real gameplay; count the new attempt now,
+    // not only when the player eventually crosses another bridge.
+    if (completed && run.phase !== 'complete') beginAttempt();
     hintResult = null;
     highlight = [];
     message = '';
@@ -595,6 +626,7 @@ export function startGame() {
       fresh.draftEdits = [...run.finalEditSet];
     }
     run = fresh;
+    analyticsStarted = false;
     message = '';
     highlight = [];
     hintResult = null;
