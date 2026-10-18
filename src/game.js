@@ -355,7 +355,8 @@ export function startGame() {
     $('begin-discovery').onclick = () => {
       motion.cancel();
       run = { ...run, phase: 'discovery' };
-      beginAttempt();
+      // Opening the discovery view (including via Hint) is not a gameplay action.
+      // The first island selection starts the attempt in selectNode().
       view = 'graph';
       message = '';
       save();
@@ -593,6 +594,7 @@ export function startGame() {
   );
   attachKeyboard($('stage'), submit, selectNode, () => actionableBridges(level, graph(), run));
   $('undo-button').onclick = () => {
+    const completed = run.phase === 'complete';
     sound.suspend();
     motion.cancel();
     cancelPointer();
@@ -604,6 +606,9 @@ export function startGame() {
           editHistory: run.editHistory.slice(0, -1),
         };
     } else run = { ...undo(run), hintTier: 0 };
+    // Undoing a finished walk reopens real gameplay; count the new attempt now,
+    // not only when the player eventually crosses another bridge.
+    if (completed && run.phase !== 'complete') beginAttempt();
     hintResult = null;
     highlight = [];
     message = '';

@@ -221,10 +221,47 @@ try {
       events: ['play', 'play', 'finish'],
       playing: false,
     });
+    await page.click('#undo-button');
+    assert.deepEqual(await inspect(), {
+      events: ['play', 'play', 'finish', 'play'],
+      playing: true,
+    });
+    await keyBridge(page, route.edges.at(-1));
+    assert.deepEqual(await inspect(), {
+      events: ['play', 'play', 'finish', 'play', 'finish'],
+      playing: false,
+    });
     // Restore a completed run: drawing an existing seal must not send play/finish.
     await page.reload();
     await page.waitForSelector('#complete-banner:not([hidden])');
     assert.deepEqual(await inspect(), { events: [], playing: false });
+    await context.close();
+  });
+  await scenario('Discovery hints open the lesson without starting analytics', async () => {
+    const { page, context } = await pageFor({ unlocked: true });
+    await page.addInitScript(() => {
+      window.__telemetryEvents = [];
+      window.hubTrack = (game, event) => window.__telemetryEvents.push({ game, event });
+    });
+    await page.goto(`${base}/?lang=en#SB24`);
+    await page.waitForSelector('#begin-discovery');
+    const inspect = () =>
+      page.evaluate(() => ({
+        events: window.__telemetryEvents.map((e) => e.event),
+        playing: window.__gamesAnalyticsPlaying.get('bridges')(),
+      }));
+    await page.click('#hint-button');
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+    for (const id of ['A', 'B', 'C', 'D']) {
+      await page.locator(`[data-node="${id}"]`).focus();
+      await page.keyboard.press('Enter');
+      if (id === 'A')
+        assert.deepEqual(await inspect(), { events: ['play'], playing: true });
+    }
+    await page.click('#explain-discovery');
+    assert.deepEqual(await inspect(), { events: ['play'], playing: false });
+    await page.click('[data-action="understand"]');
+    assert.deepEqual(await inspect(), { events: ['play', 'finish'], playing: false });
     await context.close();
   });
   await scenario(
