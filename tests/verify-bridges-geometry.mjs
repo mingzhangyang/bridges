@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { allLevels } from '../src/content/levels.js';
 import { geometry } from '../src/render/geometry.js';
 import { beginTrace, advanceTrace } from '../src/input/bridge-trace.js';
-import { placeNames } from '../src/render/city.js';
+import { ferryBerth, FERRY_BOX, placeNames } from '../src/render/city.js';
 import { propSpots, TRAVELER_SILHOUETTE } from '../src/render/scenery.js';
 
 for (const portrait of [false, true]) {
@@ -188,5 +188,53 @@ test('Every island keeps its landmark, house and tree standing clear of its own 
           }
         }
       }
+    }
+});
+test('The waiting ferry berths on open water in every level that lets the player choose a start', () => {
+  for (const level of allLevels.filter((l) => !l.fixedStart))
+    for (const portrait of [false, true]) {
+      const geo = geometry(level, portrait),
+        { x, y } = ferryBerth(level, geo),
+        box = {
+          x0: x + FERRY_BOX.x0,
+          x1: x + FERRY_BOX.x1,
+          y0: y + FERRY_BOX.y0,
+          y1: y + FERRY_BOX.y1,
+        },
+        where = `${level.id} ${portrait ? 'portrait' : 'landscape'}`,
+        gap = (p) =>
+          Math.hypot(
+            Math.max(box.x0 - p.x, 0, p.x - box.x1),
+            Math.max(box.y0 - p.y, 0, p.y - box.y1),
+          );
+      assert.ok(
+        box.x0 >= 0 && box.x1 <= geo.w && box.y0 >= 0 && box.y1 <= geo.h,
+        `${where}: off the map`,
+      );
+      for (const node of level.nodes) {
+        const q = geo.nodes[node.id],
+          cx = Math.max(box.x0, Math.min(q.x, box.x1)),
+          cy = Math.max(box.y0, Math.min(q.y, box.y1));
+        // Terrain with its shadow, and the landmark rising north of the square.
+        assert.ok(((cx - q.x) / 82) ** 2 + ((cy - q.y) / 60) ** 2 >= 1, `${where}: on ${node.id}`);
+        assert.ok(gap({ x: q.x, y: q.y - 60 }) >= 20, `${where}: on the landmark of ${node.id}`);
+        assert.ok(
+          box.x1 <= q.x - 28 || box.x0 >= q.x + 28 || box.y1 <= q.y - 80 || box.y0 >= q.y - 51,
+          `${where}: on the count badge of ${node.id}`,
+        );
+      }
+      for (const curve of Object.values(geo.curves))
+        for (let i = 0; i <= 512; i++)
+          assert.ok(gap(curve.point(i / 512)) >= 10, `${where}: on a bridge deck`);
+      for (const lang of ['zh', 'en'])
+        for (const counts of [false, true])
+          for (const [id, name] of Object.entries(placeNames(level, geo, lang, counts)))
+            assert.ok(
+              name.box.x1 <= box.x0 ||
+                name.box.x0 >= box.x1 ||
+                name.box.y1 <= box.y0 ||
+                name.box.y0 >= box.y1,
+              `${where} ${lang}: on the name of ${id}`,
+            );
     }
 });

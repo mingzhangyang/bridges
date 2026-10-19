@@ -4,6 +4,7 @@ import { serve } from '../tools/serve.mjs';
 import { allLevels, getLevel } from '../src/content/levels.js';
 import { newRun, move } from '../src/model/commands.js';
 import { eulerRoute } from '../src/model/euler.js';
+import { geometry } from '../src/render/geometry.js';
 import { repairSolution, applyEdits } from '../src/model/repair.js';
 import { emptySnapshot, STORAGE_KEY, recordCompletion } from '../src/storage.js';
 let chromium;
@@ -602,6 +603,41 @@ try {
       'Try starting at an island with an unpaired end.',
     );
   });
+  await scenario(
+    'The messenger waits offshore in every free-start level and lands on the chosen island',
+    async () => {
+      for (const level of allLevels.filter((l) => l.kind !== 'repair' && !l.fixedStart)) {
+        await p.goto(`${base}/?lang=en#${level.id}`);
+        await p.locator('#restart-button').click();
+        const waiting = await p.evaluate(() => {
+          const traveler = document.querySelector('#stage .traveler.waiting'),
+            stage = document.querySelector('#stage').getBoundingClientRect(),
+            r = traveler?.querySelector('.traveler-bob').getBoundingClientRect();
+          return (
+            !!r &&
+            r.width > 20 &&
+            r.left >= stage.left &&
+            r.right <= stage.right &&
+            r.top >= stage.top &&
+            r.bottom <= stage.bottom
+          );
+        });
+        assert.ok(waiting, `${level.id}: the waiting messenger is drawn inside the map`);
+        assert.equal(await p.locator('#stage .node.startable').count(), level.nodes.length);
+        const start = level.nodes.at(-1).id,
+          island = geometry(level).nodes[start];
+        await p.locator(`[data-node="${start}"]`).focus();
+        await p.keyboard.press('Enter');
+        assert.equal(await p.locator('#stage .traveler.waiting').count(), 0);
+        assert.equal(await p.locator('#stage .node.startable').count(), 0);
+        assert.equal(
+          await p.locator('#stage .traveler').getAttribute('transform'),
+          `translate(${island.x},${island.y})`,
+          `${level.id}: the messenger stands on ${start}`,
+        );
+      }
+    },
+  );
   await scenario(
     'Second hint identifies the connector and stranded side without revealing the next bridge',
     async () => {
