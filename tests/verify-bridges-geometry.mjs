@@ -65,7 +65,7 @@ test('A drag leaving every corridor cannot join a different bridge at a crossing
   assert.equal(trace.complete, undefined);
   assert.deepEqual(trace.candidates, []);
 });
-test('Island names never sit on a bridge deck, another island, another name or a count badge', () => {
+test('Island names stay clear of bridges, islands, landmarks, names and count badges', () => {
   for (const level of allLevels)
     for (const portrait of [false, true])
       for (const lang of ['zh', 'en'])
@@ -74,10 +74,28 @@ test('Island names never sit on a bridge deck, another island, another name or a
             names = placeNames(level, geo, lang, counts),
             where = `${level.id} ${portrait ? 'portrait' : 'landscape'} ${lang}${counts ? ' counts' : ''}`,
             overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1,
+            // Test the same translated prop extents independently of the name algorithm.
+            landmarks = level.nodes.flatMap((node, i) => {
+              const { x, y } = geo.nodes[node.id];
+              return propSpots(node.id, i, geo).map(({ box }) => ({
+                id: node.id,
+                box: {
+                  x0: x + box.x0 - 2,
+                  x1: x + box.x1 + 2,
+                  y0: y + box.y0 - 2,
+                  y1: y + box.y1 + 2,
+                },
+              }));
+            }),
             entries = Object.entries(names);
           for (const [i, [id, { box }]] of entries.entries()) {
             for (const [other, name] of entries.slice(i + 1))
               assert.ok(!overlaps(box, name.box), `${where}: ${id} overlaps ${other}`);
+            for (const landmark of landmarks)
+              assert.ok(
+                !overlaps(box, landmark.box),
+                `${where}: ${id} obscures landmark on ${landmark.id}`,
+              );
             for (const node of level.nodes) {
               const q = geo.nodes[node.id];
               // Every other island's terrain top (72 × 47) stays clear of the name.

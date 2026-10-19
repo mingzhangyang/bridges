@@ -88,12 +88,25 @@ export const NAME_STEPS = [1, 0.9, 0.8, 0.7];
 function placeNamesFresh(level, geo, lang, counts) {
   const placed = {},
     // With bridge counts on, each island's count badge sits above it; names keep clear of it.
-    boxes = counts
-      ? level.nodes.map((n) => {
-          const { x, y } = geo.nodes[n.id];
-          return { x0: x - 28, x1: x + 28, y0: y - 80, y1: y - 51 };
-        })
-      : [],
+    // Names reserve every scaled landmark silhouette, including the one on their own
+    // island. Use the same prop geometry as the renderer so art and labels cannot drift.
+    boxes = [
+      ...level.nodes.flatMap((n, i) => {
+        const { x, y } = geo.nodes[n.id];
+        return propSpots(n.id, i, geo).map(({ box }) => ({
+          x0: x + box.x0 - 4,
+          x1: x + box.x1 + 4,
+          y0: y + box.y0 - 4,
+          y1: y + box.y1 + 4,
+        }));
+      }),
+      ...(counts
+        ? level.nodes.map((n) => {
+            const { x, y } = geo.nodes[n.id];
+            return { x0: x - 28, x1: x + 28, y0: y - 80, y1: y - 51 };
+          })
+        : []),
+    ],
     samples = Object.values(geo.curves).flatMap((c) => c.samples);
   for (const node of level.nodes) {
     // The largest size that stands clear wins; where none does, the clearest spot of any size.
