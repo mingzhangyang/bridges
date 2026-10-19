@@ -162,6 +162,8 @@ h1 {
   font-weight: 500;
   letter-spacing: 2px;
   margin: 0 0 12px;
+  /* A narrow screen breaks the tagline at its comma, never inside a phrase. */
+  word-break: keep-all;
 }
 .intro p:last-child {
   color: var(--muted);
