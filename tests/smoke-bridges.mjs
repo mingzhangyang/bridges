@@ -639,6 +639,61 @@ try {
     },
   );
   await scenario(
+    'Every scene frames its whole harbour; desktop island names render at 12px or larger',
+    async () => {
+      // Everything the scene draws must sit inside the stage that shows it.
+      const unframed = (page) =>
+        page.evaluate(() => {
+          const stage = document.querySelector('#stage').getBoundingClientRect();
+          return [
+            ...document.querySelectorAll(
+              '#stage .land, #stage .props, #stage .span, #stage .land-name, #stage .traveler-bob, #stage .node-dot',
+            ),
+          ]
+            .filter((el) => {
+              const b = el.getBoundingClientRect();
+              return (
+                b.width &&
+                (b.left < stage.left - 1 ||
+                  b.right > stage.right + 1 ||
+                  b.top < stage.top - 1 ||
+                  b.bottom > stage.bottom + 1)
+              );
+            })
+            .map((el) => el.getAttribute('class'));
+        });
+      const smallestName = (page) =>
+        page.evaluate(() => {
+          const scale = document.querySelector('#stage svg').getScreenCTM().a;
+          return Math.min(
+            ...[...document.querySelectorAll('#stage .land-name')].map(
+              (el) => parseFloat(getComputedStyle(el).fontSize) * scale,
+            ),
+          );
+        });
+      const phone = await pageFor({ mobile: true, unlocked: true });
+      try {
+        await p.setViewportSize({ width: 1366, height: 768 });
+        for (const level of allLevels)
+          for (const lang of ['zh', 'en']) {
+            await p.goto(`${base}/?lang=${lang}#${level.id}`);
+            await p.locator('#stage svg').waitFor();
+            assert.deepEqual(await unframed(p), [], `${level.id} ${lang} desktop`);
+            // Measured while playing: a completion banner takes its own share of the map.
+            await p.locator('#restart-button').click();
+            const px = await smallestName(p);
+            assert.ok(px >= 12, `${level.id} ${lang}: a name renders at ${px.toFixed(1)}px`);
+            await phone.page.goto(`${base}/?lang=${lang}#${level.id}`);
+            await phone.page.locator('#stage svg').waitFor();
+            assert.deepEqual(await unframed(phone.page), [], `${level.id} ${lang} phone`);
+          }
+      } finally {
+        await p.setViewportSize({ width: 1440, height: 1000 });
+        await phone.context.close();
+      }
+    },
+  );
+  await scenario(
     'Second hint identifies the connector and stranded side without revealing the next bridge',
     async () => {
       await p.goto(`${base}/?lang=en#SB08`);

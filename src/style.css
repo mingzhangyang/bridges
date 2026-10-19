@@ -147,7 +147,16 @@ nav button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 26px 0 24px;
+  gap: 24px;
+  margin: 16px 0;
+}
+/* One slim row, so the height goes to the map: tagline, subtitle, then the daily walk. */
+.intro > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  min-width: 0;
 }
 .eyebrow {
   font-size: 11px;
@@ -158,10 +167,10 @@ nav button {
 }
 h1 {
   font-family: 'Songti SC', 'Noto Serif CJK SC', Georgia, serif;
-  font-size: 42px;
+  font-size: 28px;
   font-weight: 500;
   letter-spacing: 2px;
-  margin: 0 0 12px;
+  margin: 0;
   /* A narrow screen breaks the tagline at its comma, never inside a phrase. */
   word-break: keep-all;
 }
@@ -169,24 +178,21 @@ h1 {
   color: var(--muted);
   font-size: 13px;
   letter-spacing: 0.8px;
+  margin: 0;
 }
 .daily-link {
-  display: grid;
-  grid-template-columns: 30px 1fr;
-  gap: 5px 10px;
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 10px;
   text-align: left;
-  padding: 15px 21px;
+  padding: 8px 16px;
   border-radius: 9px;
   font-size: 13px;
 }
 .daily-link > span:first-child {
-  grid-row: span 2;
-  align-self: center;
+  display: inline-grid;
   color: var(--accent);
-}
-.daily-link .icon {
-  width: 26px;
-  height: 26px;
 }
 .daily-link small {
   font-family: monospace;
@@ -220,7 +226,7 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 24px;
+  padding: 12px 24px;
   color: var(--map-label);
   font-size: 11px;
   letter-spacing: 1.8px;
@@ -231,8 +237,6 @@ h1 {
 }
 .map-bottomline {
   gap: 8px;
-  padding-top: 14px;
-  padding-bottom: 18px;
 }
 .map-bottomline > span:nth-child(2) {
   letter-spacing: 0;
@@ -245,19 +249,25 @@ h1 {
   white-space: nowrap;
 }
 .stage {
-  flex: 1;
-  min-height: 0;
+  flex: none;
+  height: clamp(180px, calc(100dvh - 314px - var(--completion-space, 0px)), 600px);
   touch-action: none;
   position: relative;
   /* The scene's water bleeds past its viewBox to fill whatever shape the panel takes. */
   overflow: hidden;
   display: grid;
+  /* One track the size of the stage, so the scene fits it instead of stretching it. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
 }
 .city-scene {
   display: block;
+  margin: auto;
   width: 100%;
-  height: clamp(180px, calc(100dvh - 440px - var(--completion-space, 0px)), 600px);
+  height: 100%;
+  /* Each scene frames only its own harbour; a sparse one may grow to 1.1× its drawn size. */
+  max-width: calc(var(--view-w, 1100) * 1.1px);
+  max-height: calc(var(--view-h, 670) * 1.1px);
   overflow: visible;
 }
 .terrain,
@@ -442,20 +452,20 @@ h1 {
   pointer-events: all;
 }
 .land-name {
-  font-size: 14px;
+  font-size: 20px;
   fill: #2f5864;
   letter-spacing: 1px;
   pointer-events: none;
   /* A halo of water colour keeps the name readable wherever it lands. */
   paint-order: stroke;
   stroke: #e3eeec;
-  stroke-width: 4px;
+  stroke-width: 5px;
   stroke-linejoin: round;
   stroke-opacity: 0.85;
 }
 .portrait .land-name {
-  font-size: 22px;
-  stroke-width: 6px;
+  font-size: 28px;
+  stroke-width: 7px;
 }
 .portrait .node-letter {
   font-size: 19px;
@@ -571,6 +581,10 @@ h1 {
   stroke-width: 22;
   opacity: 0.3;
   pointer-events: none;
+}
+/* Landmarks stand up off the paper with a crisp cut-out shadow. */
+.landmark {
+  filter: drop-shadow(2px 2.5px 0 rgb(34 63 81 / 0.22));
 }
 .wake {
   fill: none;
@@ -1016,6 +1030,10 @@ dialog::backdrop {
 [data-theme='dark'] .city-scene .land {
   filter: brightness(0.8) saturate(0.9);
 }
+.atmosphere-4 .land-sheet,
+[data-theme='dark'] .city-scene .land-sheet {
+  opacity: 0.45;
+}
 [data-theme='dark'] #complete-banner {
   background: #283d43ed;
 }
@@ -1023,8 +1041,8 @@ dialog::backdrop {
   color: #e9d6a9;
 }
 @media (min-width: 1450px) {
-  .city-scene {
-    max-height: 670px;
+  .stage {
+    height: clamp(180px, calc(100dvh - 314px - var(--completion-space, 0px)), 670px);
   }
 }
 @media (max-width: 1050px) {
@@ -1045,7 +1063,7 @@ dialog::backdrop {
     font-size: 22px;
   }
   .intro {
-    margin: 30px 0 24px;
+    margin: 16px 0;
   }
 }
 @media (max-width: 700px) {
@@ -1085,23 +1103,16 @@ dialog::backdrop {
     font-size: 11px;
   }
   .intro {
-    margin: 24px 0 18px;
+    margin: 14px 0;
     gap: 10px;
   }
   h1 {
-    font-size: 29px;
+    font-size: 22px;
     letter-spacing: 1px;
-    margin-bottom: 8px;
   }
   .intro p:last-child {
     font-size: 12px;
     letter-spacing: 0;
-    margin: 0;
-  }
-  .intro .eyebrow {
-    font-size: 10px;
-    letter-spacing: 2px;
-    margin-bottom: 10px;
   }
   .daily-link {
     display: flex;
@@ -1136,8 +1147,9 @@ dialog::backdrop {
   .map-bottomline > span:nth-child(2) {
     font-size: 11px;
   }
-  .city-scene {
+  .stage {
     height: auto;
+    aspect-ratio: 720 / 820;
     max-height: 70dvh;
     min-height: 350px;
   }
@@ -1270,9 +1282,8 @@ dialog::backdrop {
   .journey-layout {
     margin-top: 18px;
   }
-  .city-scene {
+  .stage {
     height: max(120px, calc(100dvh - 200px - var(--completion-space, 0px)));
-    min-height: 0;
   }
   .journal {
     padding: 0;
@@ -1337,10 +1348,6 @@ dialog::backdrop {
 .atmosphere-4 .street.walked,
 [data-theme='dark'] .city-scene .street.walked {
   stroke: #ffd48a;
-}
-.atmosphere-4 .tree,
-[data-theme='dark'] .city-scene .tree {
-  fill: #35525a;
 }
 .atmosphere-4 .beacon,
 [data-theme='dark'] .city-scene .beacon {
@@ -1411,7 +1418,7 @@ dialog::backdrop {
     white-space: nowrap;
   }
   h1 {
-    font-size: 24px;
+    font-size: 20px;
     line-height: 1.35;
   }
   .brand {

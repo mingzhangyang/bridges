@@ -39,8 +39,8 @@ try {
       .cover-copy p { font:16px/1.8 Arial,sans-serif; color:#596968; margin:12px 0; }
       .cover-map { align-self:stretch; display:flex; flex-direction:column; overflow:hidden; border:1px solid #b8cdd0; border-radius:16px; background:#c2dcdf; }
       .cover-label { padding:18px 22px; display:flex; justify-content:space-between; font:10px Arial,sans-serif; letter-spacing:1.6px; color:#2b4c53; }
-      .cover-scene { flex:1; display:grid; place-items:center; overflow:hidden; }
-      .cover-scene .city-scene { width:100%; height:auto; max-height:none; }
+      .cover-scene { flex:1; min-height:0; display:grid; grid-template:minmax(0,1fr)/minmax(0,1fr); place-items:center; overflow:hidden; }
+      .cover-scene .city-scene { width:100%; height:100%; max-width:none; max-height:none; }
     </style></head><body>
     <div class="cover-copy"><svg class="cover-mark" viewBox="0 0 40 28" aria-hidden="true"><path d="M3 19h34M7 19q13-15 26 0M13.5 19v-5.5M20 19v-7.5M26.5 19v-5.5M4 25q4-2.4 8 0t8 0t8 0t8 0"/></svg>
       <h1>Seven<br>Bridges</h1><div class="cover-kicker">EVERY BRIDGE. ONCE.</div>
