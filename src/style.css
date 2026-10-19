@@ -162,6 +162,10 @@ h1 {
   font-weight: 500;
   letter-spacing: 2px;
   margin: 0 0 12px;
+  /* A narrow screen breaks the tagline at its comma, never inside a phrase, and an English
+     line wraps into even halves rather than leaving one word alone. */
+  word-break: keep-all;
+  text-wrap: balance;
 }
 .intro p:last-child {
   color: var(--muted);
