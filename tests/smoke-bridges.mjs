@@ -626,8 +626,26 @@ try {
         assert.equal(await p.locator('#stage .node.startable').count(), level.nodes.length);
         const start = level.nodes.at(-1).id,
           island = geometry(level).nodes[start];
+        // Keyboard focus must use the existing solid high-contrast node outline, not the
+        // marching start ring. A Tab first establishes the keyboard input modality.
+        if (level.id === 'SB04') await p.keyboard.press('Tab');
         await p.locator(`[data-node="${start}"]`).focus();
+        if (level.id === 'SB04') {
+          const focus = await p.locator(`[data-node="${start}"] .node-dot`).evaluate((el) => ({
+            focusVisible: el.parentElement.matches(':focus-visible'),
+            strokeWidth: getComputedStyle(el).strokeWidth,
+            opacity: getComputedStyle(el).opacity,
+          }));
+          assert.deepEqual(focus, { focusVisible: true, strokeWidth: '5px', opacity: '1' });
+        }
         await p.keyboard.press('Enter');
+        if (level.id === 'SB04') {
+          assert.equal(
+            await p.locator('#stage .ferry-leaving').evaluate((el) => getComputedStyle(el).opacity),
+            '0',
+            'the ferry must disappear immediately with reduced motion',
+          );
+        }
         assert.equal(await p.locator('#stage .traveler.waiting').count(), 0);
         assert.equal(await p.locator('#stage .node.startable').count(), 0);
         assert.equal(
