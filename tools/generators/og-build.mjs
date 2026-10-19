@@ -43,7 +43,7 @@ try {
       .cover-scene .city-scene { width:100%; height:100%; max-width:none; max-height:none; }
     </style></head><body>
     <div class="cover-copy"><svg class="cover-mark" viewBox="0 0 40 28" aria-hidden="true"><path d="M3 19h34M7 19q13-15 26 0M13.5 19v-5.5M20 19v-7.5M26.5 19v-5.5M4 25q4-2.4 8 0t8 0t8 0t8 0"/></svg>
-      <h1>Seven<br>Bridges</h1><div class="cover-kicker">EVERY BRIDGE. ONCE.</div>
+      <h1>Seven<br>Bridges</h1><div class="cover-kicker">CROSS EVERY BRIDGE JUST ONCE.</div>
       <p>Read a city.<br>Build a new way.</p><div class="cover-kicker">A CITY, ONE JOURNEY</div>
     </div><div class="cover-map"><div class="cover-label"><span>THE CITY OF SEVEN BRIDGES</span><span>CITY ATLAS</span></div>
     <div class="cover-scene">${scene}</div><div class="cover-label"><span>EST. 1736</span><span>MADE FOR WANDERING</span></div></div>
