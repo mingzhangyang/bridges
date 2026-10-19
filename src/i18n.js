@@ -5,7 +5,7 @@ const strings = {
   holdReplay: ['按住回放', 'Hold to replay'],
   rewindHere: ['撤回到这里', 'Rewind to here'],
   title: ['七桥漫游', 'Seven Bridges'],
-  tagline: ['每座桥，一次。', 'Every bridge. Once.'],
+  tagline: ['每座桥，只能走一遍。', 'Every bridge. Once.'],
   subtitle: ['读懂一座城，也为它造一条新路。', 'Read a city. Build a new way through it.'],
   map: ['城市地图', 'City atlas'],
   help: ['玩法', 'How to play'],
