@@ -27,6 +27,7 @@ const strings = {
     'No bridges left here. Keep your journey and undo a step.',
   ],
   finish: ['旅程完成，灯火已连成一线。', 'Journey complete. The harbour is alight.'],
+  cleared: ['旅程完成', 'Journey complete'],
   open: ['每桥一次，终点可以不同', 'Every bridge once; finish anywhere'],
   return: ['每桥一次，最后回到出发点', 'Every bridge once; return to your start'],
   fixed: ['每桥一次，遵守指定起终点', 'Every bridge once; respect required endpoints'],

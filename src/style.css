@@ -383,8 +383,9 @@ h1 {
   stroke-width: 40;
   pointer-events: stroke;
 }
-/* Map elements show focus on their own shape; a box around a curved bridge reads as a frame. */
-.city-scene [tabindex]:focus-visible {
+/* Map elements show focus on their own shape; a box around a curved bridge reads as a frame.
+   Chromium's SVG defaults outline every focused element, even one focused by a click. */
+.city-scene [tabindex]:focus {
   outline: none;
 }
 .bridge:focus-visible .bridge-halo {
@@ -799,6 +800,14 @@ footer a:hover {
   padding: 14px 18px;
   border-radius: 10px;
   box-shadow: 0 8px 30px #24465512;
+  /* Rises in as the last bridge lights; reduced motion shows it in place. */
+  animation: banner-rise 0.5s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+@keyframes banner-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
 #complete-banner[hidden] {
   display: none;
