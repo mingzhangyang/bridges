@@ -34,7 +34,7 @@ import { dailyEntry, dailyHash } from './services/daily.js';
 import { hint } from './services/hints.js';
 import { postcardBlob, downloadBlob } from './services/export.js';
 import { geometry } from './render/geometry.js';
-import { citySVG } from './render/city.js';
+import { citySVG, ferryBerth } from './render/city.js';
 import { commissionStamp } from './render/stamps.js';
 import { bridgeLabel, bridgeName, placeLabel } from './render/labels.js';
 import { escape } from './render/escape.js';
@@ -60,6 +60,7 @@ export function startGame() {
     message = '',
     hintResult = null,
     geo = null,
+    arrival = null,
     dialogAction = null,
     sceneGeneration = 0,
     dialogCleanup = null;
@@ -175,7 +176,9 @@ export function startGame() {
       counts,
       hintIds: highlight,
       riskId: hintResult?.kind === 'risk' ? hintResult.edge : null,
+      arrivedFrom: arrival,
     });
+    arrival = null;
     if (focused?.bridge)
       $('stage').querySelector(`[data-bridge="${focused.bridge}"]`)?.focus({ preventScroll: true });
     if (focused?.node)
@@ -552,7 +555,9 @@ export function startGame() {
       run = { ...run, discoveryNodes: selected };
       message = '';
     } else {
+      const from = geo.nodes[run.currentNode] ?? ferryBerth(level, geo);
       run = chooseStart(level, run, id);
+      if (geo.nodes[id] !== from) arrival = from;
       message = '';
     }
     beginAttempt();

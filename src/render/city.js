@@ -127,6 +127,45 @@ function placeNamesFresh(level, geo, lang, counts) {
   }
   return placed;
 }
+// Before a start is chosen the messenger waits offshore in a ferry, in the open water nearest
+// the harbour that keeps clear of every island, bridge (built or planned) and name in either
+// language, so the berth stays put through counts, language and blueprint edits.
+const berths = new WeakMap();
+// The ferry with its passenger, relative to the berth: hull below, the messenger's hat above.
+export const FERRY_BOX = { x0: -36, x1: 36, y0: -50, y1: 32 };
+const boxGap = (a, b) =>
+  Math.hypot(Math.max(a.x0 - b.x1, 0, b.x0 - a.x1), Math.max(a.y0 - b.y1, 0, b.y0 - a.y1));
+export function ferryBerth(level, geo) {
+  const known = berths.get(level) ?? new Map();
+  berths.set(level, known);
+  if (known.has(geo.w)) return known.get(geo.w);
+  const samples = Object.values(geo.curves).flatMap((c) => c.samples),
+    names = ['zh', 'en'].flatMap((lang) =>
+      Object.values(placeNames(level, geo, lang, false)).map((n) => n.box),
+    ),
+    islands = Object.values(geo.nodes);
+  let best = null;
+  for (let x = 50; x <= geo.w - 50; x += 15)
+    for (let y = 62; y <= geo.h - 44; y += 15) {
+      const box = {
+        x0: x + FERRY_BOX.x0,
+        x1: x + FERRY_BOX.x1,
+        y0: y + FERRY_BOX.y0,
+        y1: y + FERRY_BOX.y1,
+      };
+      // Islands keep their terrain, landmarks and count badges; decks keep a margin of water.
+      let clear = Infinity;
+      for (const o of islands) clear = Math.min(clear, rectDistance(o, box) - 95);
+      for (const p of samples) clear = Math.min(clear, rectDistance(p, box) - 12);
+      for (const name of names) clear = Math.min(clear, boxGap(name, box) - 6);
+      const near = Math.min(...islands.map((o) => Math.hypot(x - o.x, y - o.y))),
+        score = Math.min(clear, 24) - near * 0.04 + (y / geo.h) * 4;
+      if (!best || score > best.score) best = { x, y, score };
+    }
+  known.set(geo.w, { x: best.x, y: best.y });
+  return known.get(geo.w);
+}
+const FERRY = `<path class="ferry-wake" d="M-58 30q10 -5 20 0M42 31q9 -4 18 0"/><path class="ferry-hull" d="M-36 14H36L27 28Q0 33 -27 28Z"/><path class="ferry-rim" d="M-36 14H36"/>`;
 const segmentCross = (p, q, r, s) => {
   const d = (q.x - p.x) * (s.y - r.y) - (q.y - p.y) * (s.x - r.x);
   if (!d) return null;
@@ -228,6 +267,7 @@ export function citySVG(
     hintIds = [],
     riskId = null,
     interactive = true,
+    arrivedFrom = null,
   } = {},
 ) {
   const palette = palettes[level.chapter - 1] ?? palettes[0],
@@ -272,7 +312,7 @@ export function citySVG(
         : action
           ? ` role="button" tabindex="0"${action === 'toggle' ? ` aria-pressed="${Boolean(selected)}"` : ''} aria-label="${esc(label)}"`
           : ` role="img" aria-label="${esc(label)}"`;
-    labels += `<g class="node ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${action ? 'actionable' : ''}"${interactive ? ` data-node="${node.id}"` : ''}${a11y}><circle class="node-dot" cx="${x}" cy="${y}" r="22"/><circle class="node-hit" cx="${x}" cy="${y}" r="43" fill="transparent"/><text x="${x}" y="${y + (portrait ? 7 : 6)}" text-anchor="middle" class="node-letter">${node.id}</text><text x="${name.x}" y="${name.y}" text-anchor="${name.anchor}" class="land-name">${name.lines.map((line, k) => (k ? `<tspan x="${name.x}" dy="${name.lead}">${esc(line)}</tspan>` : esc(line))).join('')}</text>${counts ? `<g class="degree"><rect x="${x - 28}" y="${y - 80}" width="56" height="29" rx="14"/><text x="${x}" y="${y - 60}" text-anchor="middle">${'Ⅱ'.repeat(Math.floor(d[node.id] / 2))}${d[node.id] % 2 ? ' •' : ''} ${d[node.id]}</text></g>` : ''}</g>`;
+    labels += `<g class="node ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${action ? 'actionable' : ''} ${action === 'start' && !run.currentNode ? 'startable' : ''}"${interactive ? ` data-node="${node.id}"` : ''}${a11y}><circle class="node-dot" cx="${x}" cy="${y}" r="22"/><circle class="node-hit" cx="${x}" cy="${y}" r="43" fill="transparent"/><text x="${x}" y="${y + (portrait ? 7 : 6)}" text-anchor="middle" class="node-letter">${node.id}</text><text x="${name.x}" y="${name.y}" text-anchor="${name.anchor}" class="land-name">${name.lines.map((line, k) => (k ? `<tspan x="${name.x}" dy="${name.lead}">${esc(line)}</tspan>` : esc(line))).join('')}</text>${counts ? `<g class="degree"><rect x="${x - 28}" y="${y - 80}" width="56" height="29" rx="14"/><text x="${x}" y="${y - 60}" text-anchor="middle">${'Ⅱ'.repeat(Math.floor(d[node.id] / 2))}${d[node.id] % 2 ? ' •' : ''} ${d[node.id]}</text></g>` : ''}</g>`;
   }
   const shadows = crossingShadows(level, visible, geo, (edge) => {
     const edit = planning && candidateFor(level, edge.id);
@@ -307,8 +347,20 @@ export function citySVG(
       streets += `<path class="street ${walked ? 'walked' : ''} ${removed ? 'removed' : ''}" d="${curve.path}"/>`;
     bridges += `<g class="bridge ${walked ? 'walked' : ''} ${action === 'walk' ? 'available' : ''} ${action ? 'actionable' : ''} ${ghost ? 'ghost' : ''} ${removed ? 'removed' : ''} ${hinted ? 'hinted' : ''} ${riskId === edge.id ? 'risk' : ''}"${interactive ? ` data-bridge="${edge.id}"` : ''}${a11y}><g class="span" mask="url(#quay-${uid})"><path class="bridge-halo" d="${curve.path}"/><path class="bridge-shadow" d="${curve.path}" transform="translate(3,9)"/>${shadows[edge.id] ?? ''}<path class="bridge-rail" d="${curve.path}"/><path class="bridge-deck" d="${curve.path}" stroke="${color}"/>${bridgeSurface(curve, edge.material)}</g><g class="abutments">${abutments(curve)}</g>${lamps ? `<g class="lamps">${lamps}</g>` : ''}${ghost ? `<text x="${curve.point(0.5).x}" y="${curve.point(0.5).y + 5}" class="slot-label">+</text>` : ''}<path class="bridge-hit" d="${curve.path}" style="stroke-width:${geo.w === 720 ? 88 : 48}"/></g>`;
   }
-  const pos = geo.nodes[run.currentNode] ?? { x: -100, y: -100 },
+  // Static illustrations without a start (the pairing diagram) leave the messenger out.
+  const waiting = interactive && !geo.nodes[run.currentNode],
+    pos = geo.nodes[run.currentNode] ?? (waiting ? ferryBerth(level, geo) : { x: -100, y: -100 }),
+    // The step ashore from the ferry, played once on the render that follows choosing a start.
+    hop = arrivedFrom
+      ? ` traveler-hop" style="--hop-x:${(arrivedFrom.x - pos.x).toFixed(1)}px;--hop-y:${(arrivedFrom.y - pos.y).toFixed(1)}px`
+      : '',
+    berth = arrivedFrom && ferryBerth(level, geo),
+    // Landing from the ferry leaves it to drift at its berth for a moment.
+    ferry =
+      arrivedFrom && arrivedFrom.x === berth.x && arrivedFrom.y === berth.y
+        ? `<g transform="translate(${berth.x},${berth.y})" aria-hidden="true"><g class="ferry-leaving">${FERRY}</g></g>`
+        : '',
     { w, h } = geo,
     bleed = `x="${-w}" y="${-h}" width="${3 * w}" height="${3 * h}"`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" class="city-scene atmosphere-${level.chapter} ${portrait ? 'portrait' : ''} ${view === 'graph' ? 'graph-view' : ''} ${planning ? 'blueprint' : ''} ${run.phase === 'complete' ? 'journey-complete' : ''}" aria-label="${interactive ? (lang === 'zh' ? '河港地图，点击相邻桥行走' : 'Harbour map. Click adjacent bridges to walk.') : lang === 'zh' ? '河港路线示意图' : 'Harbour route illustration.'}" role="${interactive ? 'group' : 'img'}"><defs><linearGradient id="water-${uid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w * 0.6}" y2="${h}"><stop class="water-a" stop-color="${water[0]}"/><stop class="water-b" offset="1" stop-color="${water[1]}"/></linearGradient><radialGradient id="sky-${uid}" gradientUnits="userSpaceOnUse" cx="${w * 0.15}" cy="${-h * 0.1}" r="${w * 0.9}"><stop stop-color="${sky[0]}" stop-opacity="${sky[1]}"/><stop offset="1" stop-color="${sky[0]}" stop-opacity="0"/></radialGradient><radialGradient id="lamplight-${uid}"><stop stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient><pattern id="ripples-${uid}" width="100" height="66" patternUnits="userSpaceOnUse"><path d="M10 22q16 -5 32 0M62 51q10 -4 20 0" stroke="#fff" opacity=".22" fill="none"/></pattern><pattern id="swell-${uid}" width="164" height="106" patternUnits="userSpaceOnUse" patternTransform="translate(37,19)"><path d="M20 30q22 -7 44 0M104 78q14 -5 28 0M66 96q9 -3 18 0" stroke="#fff" stroke-width="1.3" opacity=".14" fill="none"/></pattern><mask id="quay-${uid}" maskUnits="userSpaceOnUse" ${bleed}><rect ${bleed} fill="#fff"/>${quays}</mask><clipPath id="land-${uid}">${land}</clipPath></defs><rect class="water" ${bleed} fill="url(#water-${uid})"/><rect class="water-texture" ${bleed} fill="url(#ripples-${uid})"/><rect class="water-texture" ${bleed} fill="url(#swell-${uid})"/><rect class="sky" ${bleed} fill="url(#sky-${uid})"/><g class="city-world"><g class="reflections" aria-hidden="true">${reflections}</g><g class="terrain">${terrain}</g><g class="streets" clip-path="url(#land-${uid})">${streets}</g><g class="terrain-props">${props}</g><g class="bridges">${bridges}</g><g class="nodes">${labels}</g><g class="traveler" transform="translate(${pos.x},${pos.y})" aria-hidden="true"><ellipse class="traveler-ring" cy="14" rx="27" ry="12"/><g class="traveler-bob"><g transform="translate(0,-5) scale(1.45)"><ellipse cy="17" rx="14" ry="5" fill="#213b49" opacity=".2"/><path d="M-9 12l3 -23h12l5 23Z" fill="#d38a45" stroke="#7a4a22" stroke-width=".8"/><circle cy="-18" r="8" fill="#f2dbb7" stroke="#8a6a4a" stroke-width=".6"/><path d="M-10 -20l4 -8h12l5 8Z" fill="#394e58"/><path d="M9 -4l8 4 -3 12 -8 -3Z" fill="#f7ecd2" stroke="#9b8a6a" stroke-width=".6"/><path d="M-3 12v6M6 12v6" stroke="#435661" stroke-width="4"/></g></g></g></g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" class="city-scene atmosphere-${level.chapter} ${portrait ? 'portrait' : ''} ${view === 'graph' ? 'graph-view' : ''} ${planning ? 'blueprint' : ''} ${run.phase === 'complete' ? 'journey-complete' : ''}" aria-label="${interactive ? (lang === 'zh' ? '河港地图，点击相邻桥行走' : 'Harbour map. Click adjacent bridges to walk.') : lang === 'zh' ? '河港路线示意图' : 'Harbour route illustration.'}" role="${interactive ? 'group' : 'img'}"><defs><linearGradient id="water-${uid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w * 0.6}" y2="${h}"><stop class="water-a" stop-color="${water[0]}"/><stop class="water-b" offset="1" stop-color="${water[1]}"/></linearGradient><radialGradient id="sky-${uid}" gradientUnits="userSpaceOnUse" cx="${w * 0.15}" cy="${-h * 0.1}" r="${w * 0.9}"><stop stop-color="${sky[0]}" stop-opacity="${sky[1]}"/><stop offset="1" stop-color="${sky[0]}" stop-opacity="0"/></radialGradient><radialGradient id="lamplight-${uid}"><stop stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient><pattern id="ripples-${uid}" width="100" height="66" patternUnits="userSpaceOnUse"><path d="M10 22q16 -5 32 0M62 51q10 -4 20 0" stroke="#fff" opacity=".22" fill="none"/></pattern><pattern id="swell-${uid}" width="164" height="106" patternUnits="userSpaceOnUse" patternTransform="translate(37,19)"><path d="M20 30q22 -7 44 0M104 78q14 -5 28 0M66 96q9 -3 18 0" stroke="#fff" stroke-width="1.3" opacity=".14" fill="none"/></pattern><mask id="quay-${uid}" maskUnits="userSpaceOnUse" ${bleed}><rect ${bleed} fill="#fff"/>${quays}</mask><clipPath id="land-${uid}">${land}</clipPath></defs><rect class="water" ${bleed} fill="url(#water-${uid})"/><rect class="water-texture" ${bleed} fill="url(#ripples-${uid})"/><rect class="water-texture" ${bleed} fill="url(#swell-${uid})"/><rect class="sky" ${bleed} fill="url(#sky-${uid})"/><g class="city-world"><g class="reflections" aria-hidden="true">${reflections}</g><g class="terrain">${terrain}</g><g class="streets" clip-path="url(#land-${uid})">${streets}</g><g class="terrain-props">${props}</g><g class="bridges">${bridges}</g><g class="nodes">${labels}</g>${ferry}<g class="traveler${waiting ? ' waiting' : ''}" transform="translate(${pos.x},${pos.y})" aria-hidden="true"><g class="traveler-step${hop}"><ellipse class="traveler-ring" cy="14" rx="27" ry="12"/><g class="traveler-bob"><g transform="translate(0,-5) scale(1.45)"><ellipse cy="17" rx="14" ry="5" fill="#213b49" opacity=".2"/><path d="M-9 12l3 -23h12l5 23Z" fill="#d38a45" stroke="#7a4a22" stroke-width=".8"/><circle cy="-18" r="8" fill="#f2dbb7" stroke="#8a6a4a" stroke-width=".6"/><path d="M-10 -20l4 -8h12l5 8Z" fill="#394e58"/><path d="M9 -4l8 4 -3 12 -8 -3Z" fill="#f7ecd2" stroke="#9b8a6a" stroke-width=".6"/><path d="M-3 12v6M6 12v6" stroke="#435661" stroke-width="4"/></g>${waiting ? FERRY : ''}</g></g></g></g></svg>`;
 }
