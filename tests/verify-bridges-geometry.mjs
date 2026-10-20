@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { allLevels } from '../src/content/levels.js';
 import { geometry } from '../src/render/geometry.js';
 import { beginTrace, advanceTrace } from '../src/input/bridge-trace.js';
-import { ferryBerth, FERRY_BOX, placeNames } from '../src/render/city.js';
+import { ferryBerth, FERRY_BOX, NAME_STEPS, nameSize, placeNames } from '../src/render/city.js';
 import { propSpots, TRAVELER_SILHOUETTE } from '../src/render/scenery.js';
 
 for (const portrait of [false, true]) {
@@ -65,7 +65,7 @@ test('A drag leaving every corridor cannot join a different bridge at a crossing
   assert.equal(trace.complete, undefined);
   assert.deepEqual(trace.candidates, []);
 });
-test('Island names never sit on a bridge deck, another island, another name or a count badge', () => {
+test('Island names stay clear of bridges, islands, landmarks, names and count badges', () => {
   for (const level of allLevels)
     for (const portrait of [false, true])
       for (const lang of ['zh', 'en'])
@@ -74,10 +74,28 @@ test('Island names never sit on a bridge deck, another island, another name or a
             names = placeNames(level, geo, lang, counts),
             where = `${level.id} ${portrait ? 'portrait' : 'landscape'} ${lang}${counts ? ' counts' : ''}`,
             overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1,
+            // Test the same translated prop extents independently of the name algorithm.
+            landmarks = level.nodes.flatMap((node, i) => {
+              const { x, y } = geo.nodes[node.id];
+              return propSpots(node.id, i, geo).map(({ box }) => ({
+                id: node.id,
+                box: {
+                  x0: x + box.x0 - 2,
+                  x1: x + box.x1 + 2,
+                  y0: y + box.y0 - 2,
+                  y1: y + box.y1 + 2,
+                },
+              }));
+            }),
             entries = Object.entries(names);
           for (const [i, [id, { box }]] of entries.entries()) {
             for (const [other, name] of entries.slice(i + 1))
               assert.ok(!overlaps(box, name.box), `${where}: ${id} overlaps ${other}`);
+            for (const landmark of landmarks)
+              assert.ok(
+                !overlaps(box, landmark.box),
+                `${where}: ${id} obscures landmark on ${landmark.id}`,
+              );
             for (const node of level.nodes) {
               const q = geo.nodes[node.id];
               // Every other island's terrain top (72 × 47) stays clear of the name.
@@ -139,7 +157,7 @@ test('A level keeps one name placement per layout, language and badge setting', 
     assert.notEqual(placeNames(level, geo, 'en', false), placeNames(level, geo, 'en', true));
   }
 });
-test('Every island keeps its landmark, house and tree standing clear of its own streets', () => {
+test('Every island keeps its landmark standing clear of its own streets', () => {
   for (const level of allLevels)
     for (const portrait of [false, true]) {
       const geo = geometry(level, portrait);
@@ -147,9 +165,13 @@ test('Every island keeps its landmark, house and tree standing clear of its own 
         const o = geo.nodes[node.id],
           spots = propSpots(node.id, i, geo),
           where = `${level.id} ${portrait ? 'portrait' : 'landscape'} ${node.id}`;
-        assert.deepEqual(spots.map((s) => s.role).sort(), ['house', 'landmark', 'tree'], where);
+        assert.deepEqual(
+          spots.map((s) => s.role),
+          ['landmark'],
+          where,
+        );
         for (const spot of spots) {
-          assert.ok(spot.scale >= 0.7, `${where}: ${spot.role} too small`);
+          assert.ok(spot.scale >= 0.85, `${where}: ${spot.role} too small`);
           for (const body of TRAVELER_SILHOUETTE)
             assert.ok(
               spot.box.x1 + 2 <= body.x0 ||
@@ -159,15 +181,6 @@ test('Every island keeps its landmark, house and tree standing clear of its own 
               `${where}: ${spot.role} overlaps the messenger silhouette`,
             );
         }
-        for (const [k, a] of spots.entries())
-          for (const b of spots.slice(k + 1))
-            assert.ok(
-              a.base.x1 <= b.base.x0 ||
-                b.base.x1 <= a.base.x0 ||
-                a.base.y1 <= b.base.y0 ||
-                b.base.y1 <= a.base.y0,
-              `${where}: ${a.role} and ${b.role} share ground`,
-            );
         for (const curve of Object.values(geo.curves)) {
           const end = curve.canonical.indexOf(node.id);
           if (end < 0) continue;
@@ -237,4 +250,24 @@ test('The waiting ferry berths on open water in every level that lets the player
               `${where} ${lang}: on the name of ${id}`,
             );
     }
+});
+test('A name keeps its full size unless its corner is crowded, and never shrinks past 70%', () => {
+  let stepped = 0,
+    total = 0;
+  for (const level of allLevels)
+    for (const portrait of [false, true]) {
+      const geo = geometry(level, portrait);
+      for (const lang of ['zh', 'en'])
+        for (const counts of [false, true])
+          for (const [id, name] of Object.entries(placeNames(level, geo, lang, counts))) {
+            assert.ok(
+              NAME_STEPS.some((k) => Math.abs(name.size - nameSize(geo) * k) < 1e-9),
+              `${level.id} ${id}`,
+            );
+            total++;
+            if (name.size < nameSize(geo)) stepped++;
+          }
+    }
+  // Today 38 of 1856; a regression in placement shows up as many more.
+  assert.ok(stepped / total < 0.03, `${stepped} of ${total} names stepped down`);
 });

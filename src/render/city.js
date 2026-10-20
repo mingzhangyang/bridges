@@ -4,7 +4,7 @@ import { bridgeLabel, nodeLabel } from './labels.js';
 import { escape as esc } from './escape.js';
 import { SHORE } from './geometry.js';
 import { bridgeSurface } from './materials.js';
-import { islandProps, islandSeed, shorePath } from './scenery.js';
+import { islandProps, islandSeed, propSpots, shorePath } from './scenery.js';
 const waters = [
   ['#d4e7e7', '#86b5c2'],
   ['#dae6d8', '#83b3b2'],
@@ -18,6 +18,12 @@ const skies = [
   ['#f2f6f4', 0.25],
   ['#ffcf7a', 0.12],
 ];
+// A colour mixed toward white paper by k.
+const tint = (hex, k) =>
+  `#${[1, 3, 5]
+    .map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - k) + 255 * k))
+    .map((v) => v.toString(16).padStart(2, '0'))
+    .join('')}`;
 const palettes = [
   ['#bfd6cb', '#72947c', '#b98462'],
   ['#d9d0aa', '#aaa26d', '#ac6750'],
@@ -28,10 +34,11 @@ const palettes = [
 // can share a document, and an id resolves to the first element that claims it.
 let sceneSerial = 0;
 // Candidate name positions around the quay: [dx, box-centre dy, anchor, preference cost].
-// South of the island reads first; a second, wider ring is the fallback for crowded harbours.
+// South of the island reads first; wider rings are the fallback for crowded harbours.
 const LABEL_SPOTS = [
   [80, 70, 0],
   [100, 86, 3],
+  [122, 104, 6],
 ].flatMap(([rx, ry, extra]) =>
   Array.from({ length: 16 }, (_, k) => {
     const angle = Math.PI / 2 + (k * Math.PI) / 8,
@@ -56,8 +63,8 @@ function rectDistance(p, r) {
 }
 // Put each island's name on the side of its quay that no bridge, island or other name uses.
 // The portrait map is drawn about half size on a phone, so its names are set larger.
-export const nameSize = (geo) => (geo.w === 720 ? 22 : 14);
-// An island's houses and landmark depend only on its level and layout; place them once.
+export const nameSize = (geo) => (geo.w === 720 ? 28 : 20);
+// An island's landmark depends only on its level and layout; place it once.
 const placedProps = new WeakMap();
 function scenery(level, geo, nodeId, draw) {
   const known = placedProps.get(level) ?? new Map(),
@@ -76,65 +83,125 @@ export function placeNames(level, geo, lang, counts) {
   if (!known.has(key)) known.set(key, placeNamesFresh(level, geo, lang, counts));
   return known.get(key);
 }
+// A name in a crowded corner may step down in size rather than touch a bridge or neighbour.
+export const NAME_STEPS = [1, 0.9, 0.8, 0.7];
 function placeNamesFresh(level, geo, lang, counts) {
-  const size = nameSize(geo);
   const placed = {},
     // With bridge counts on, each island's count badge sits above it; names keep clear of it.
-    boxes = counts
-      ? level.nodes.map((n) => {
-          const { x, y } = geo.nodes[n.id];
-          return { x0: x - 28, x1: x + 28, y0: y - 80, y1: y - 51 };
-        })
-      : [],
+    // Names reserve every scaled landmark silhouette, including the one on their own
+    // island. Use the same prop geometry as the renderer so art and labels cannot drift.
+    boxes = [
+      ...level.nodes.flatMap((n, i) => {
+        const { x, y } = geo.nodes[n.id];
+        return propSpots(n.id, i, geo).map(({ box }) => ({
+          x0: x + box.x0 - 4,
+          x1: x + box.x1 + 4,
+          y0: y + box.y0 - 4,
+          y1: y + box.y1 + 4,
+        }));
+      }),
+      ...(counts
+        ? level.nodes.map((n) => {
+            const { x, y } = geo.nodes[n.id];
+            return { x0: x - 28, x1: x + 28, y0: y - 80, y1: y - 51 };
+          })
+        : []),
+    ],
     samples = Object.values(geo.curves).flatMap((c) => c.samples);
   for (const node of level.nodes) {
-    const o = geo.nodes[node.id],
-      text = node.name[lang === 'zh' ? 0 : 1],
-      em = size * (lang === 'zh' ? 1.07 : 0.6),
-      // A two-word name may also be set on two lines when one line has no room.
-      layouts = [[text], ...(text.includes(' ') ? [text.split(' ')] : [])];
+    // The largest size that stands clear wins; where none does, the clearest spot of any size.
     let best = null;
-    for (const [i, lines] of layouts.entries())
-      for (const [dx, dy, anchor, cost] of LABEL_SPOTS) {
-        const width = Math.max(...lines.map((line) => [...line].length)) * em,
-          lead = size * 1.15 * (lines.length - 1),
-          x = o.x + dx,
-          // The first baseline; a wrapped name is centred on its spot as a block.
-          y = o.y + dy + size * 0.32 - lead / 2,
-          x0 = anchor === 'start' ? x : anchor === 'end' ? x - width : x - width / 2,
-          box = { x0, x1: x0 + width, y0: y - size * 0.93, y1: y + lead + size * 0.29 };
-        // Only bridge points near the box can lower its (capped) clearance.
-        let clear = 24;
-        for (const p of samples)
-          if (p.x > box.x0 - 36 && p.x < box.x1 + 36 && p.y > box.y0 - 36 && p.y < box.y1 + 36)
-            clear = Math.min(clear, rectDistance(p, box) - 12);
-        if (box.x0 < 6 || box.x1 > geo.w - 6 || box.y0 < 6 || box.y1 > geo.h - 6) clear -= 100;
-        for (const other of level.nodes) {
-          if (other.id === node.id) continue;
-          const q = geo.nodes[other.id],
-            cx = Math.max(box.x0, Math.min(q.x, box.x1)),
-            cy = Math.max(box.y0, Math.min(q.y, box.y1));
-          if (((cx - q.x) / 80) ** 2 + ((cy - q.y) / 58) ** 2 < 1) clear -= 50;
-        }
-        if (boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1))
-          clear -= 50;
-        const score = clear - (cost + i * 3) * 2.5;
-        if (!best || score > best.score)
-          best = { score, clear, x, y, anchor, box, lines, lead: size * 1.15 };
+    for (const step of NAME_STEPS) {
+      const fit = bestSpot(level, geo, node, lang, nameSize(geo) * step, boxes, samples);
+      if (fit.clear >= 0) {
+        best = fit;
+        break;
       }
+      if (!best || fit.clear > best.clear) best = fit;
+    }
     boxes.push(best.box);
     placed[node.id] = best;
   }
   return placed;
 }
+function bestSpot(level, geo, node, lang, size, boxes, samples) {
+  const o = geo.nodes[node.id],
+    text = node.name[lang === 'zh' ? 0 : 1],
+    em = size * (lang === 'zh' ? 1.07 : 0.6),
+    // A two-word name may also be set on two lines when one line has no room.
+    layouts = [[text], ...(text.includes(' ') ? [text.split(' ')] : [])];
+  let best = null;
+  for (const [i, lines] of layouts.entries())
+    for (const [dx, dy, anchor, cost] of LABEL_SPOTS) {
+      const width = Math.max(...lines.map((line) => [...line].length)) * em,
+        lead = size * 1.15 * (lines.length - 1),
+        x = o.x + dx,
+        // The first baseline; a wrapped name is centred on its spot as a block.
+        y = o.y + dy + size * 0.32 - lead / 2,
+        x0 = anchor === 'start' ? x : anchor === 'end' ? x - width : x - width / 2,
+        box = { x0, x1: x0 + width, y0: y - size * 0.93, y1: y + lead + size * 0.29 };
+      // Only bridge points near the box can lower its (capped) clearance.
+      let clear = 24;
+      for (const p of samples)
+        if (p.x > box.x0 - 36 && p.x < box.x1 + 36 && p.y > box.y0 - 36 && p.y < box.y1 + 36)
+          clear = Math.min(clear, rectDistance(p, box) - 12);
+      if (box.x0 < 6 || box.x1 > geo.w - 6 || box.y0 < 6 || box.y1 > geo.h - 6) clear -= 100;
+      for (const other of level.nodes) {
+        if (other.id === node.id) continue;
+        const q = geo.nodes[other.id],
+          cx = Math.max(box.x0, Math.min(q.x, box.x1)),
+          cy = Math.max(box.y0, Math.min(q.y, box.y1));
+        if (((cx - q.x) / 80) ** 2 + ((cy - q.y) / 58) ** 2 < 1) clear -= 50;
+      }
+      if (boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1))
+        clear -= 50;
+      const score = clear - (cost + i * 3) * 2.5;
+      if (!best || score > best.score)
+        best = { score, clear, x, y, anchor, box, lines, size, lead: size * 1.15 };
+    }
+  return best;
+}
+const boxGap = (a, b) =>
+  Math.hypot(Math.max(a.x0 - b.x1, 0, b.x0 - a.x1), Math.max(a.y0 - b.y1, 0, b.y0 - a.y1));
+const union = (boxes) => ({
+  x0: Math.min(...boxes.map((b) => b.x0)),
+  x1: Math.max(...boxes.map((b) => b.x1)),
+  y0: Math.min(...boxes.map((b) => b.y0)),
+  y1: Math.max(...boxes.map((b) => b.y1)),
+});
+// Everything a level's harbour can draw, in logical coordinates: islands with their shadows,
+// count badges, props and the messenger standing on them, every built and planned bridge
+// with its halo and shadow, and every name in either language, with or without counts.
+const harbours = new WeakMap();
+function harbourBounds(level, geo) {
+  const known = harbours.get(level) ?? new Map();
+  harbours.set(level, known);
+  if (known.has(geo.w)) return known.get(geo.w);
+  const boxes = [];
+  for (const [i, node] of level.nodes.entries()) {
+    const { x, y } = geo.nodes[node.id];
+    boxes.push({ x0: x - 86, x1: x + 86, y0: y - 82, y1: y + 68 });
+    for (const { box } of propSpots(node.id, i, geo))
+      boxes.push({ x0: x + box.x0, x1: x + box.x1, y0: y + box.y0, y1: y + box.y1 });
+  }
+  for (const curve of Object.values(geo.curves))
+    for (const p of curve.samples)
+      boxes.push({ x0: p.x - 20, x1: p.x + 23, y0: p.y - 20, y1: p.y + 27 });
+  for (const lang of ['zh', 'en'])
+    for (const counts of [false, true])
+      for (const { box } of Object.values(placeNames(level, geo, lang, counts))) boxes.push(box);
+  known.set(geo.w, union(boxes));
+  return known.get(geo.w);
+}
 // Before a start is chosen the messenger waits offshore in a ferry, in the open water nearest
 // the harbour that keeps clear of every island, bridge (built or planned) and name in either
-// language, so the berth stays put through counts, language and blueprint edits.
+// language, so the berth stays put through counts, language and blueprint edits. It prefers
+// water inside the harbour's own bounds, so it never widens the frame for nothing.
 const berths = new WeakMap();
 // The ferry with its passenger, relative to the berth: hull below, the messenger's hat above.
 export const FERRY_BOX = { x0: -36, x1: 36, y0: -50, y1: 32 };
-const boxGap = (a, b) =>
-  Math.hypot(Math.max(a.x0 - b.x1, 0, b.x0 - a.x1), Math.max(a.y0 - b.y1, 0, b.y0 - a.y1));
+// The wake trails a little further out on either side.
+const FERRY_WAKE = 60;
 export function ferryBerth(level, geo) {
   const known = berths.get(level) ?? new Map();
   berths.set(level, known);
@@ -143,7 +210,8 @@ export function ferryBerth(level, geo) {
     names = ['zh', 'en'].flatMap((lang) =>
       Object.values(placeNames(level, geo, lang, false)).map((n) => n.box),
     ),
-    islands = Object.values(geo.nodes);
+    islands = Object.values(geo.nodes),
+    harbour = harbourBounds(level, geo);
   let best = null;
   for (let x = 50; x <= geo.w - 50; x += 15)
     for (let y = 62; y <= geo.h - 44; y += 15) {
@@ -159,11 +227,43 @@ export function ferryBerth(level, geo) {
       for (const p of samples) clear = Math.min(clear, rectDistance(p, box) - 12);
       for (const name of names) clear = Math.min(clear, boxGap(name, box) - 6);
       const near = Math.min(...islands.map((o) => Math.hypot(x - o.x, y - o.y))),
-        score = Math.min(clear, 24) - near * 0.04 + (y / geo.h) * 4;
+        outside =
+          Math.max(0, harbour.x0 - (x - FERRY_WAKE)) +
+          Math.max(0, x + FERRY_WAKE - harbour.x1) +
+          Math.max(0, harbour.y0 - box.y0) +
+          Math.max(0, box.y1 - harbour.y1),
+        score = Math.min(clear, 24) - near * 0.04 + (y / geo.h) * 4 - outside * 0.15;
       if (!best || score > best.score) best = { x, y, score };
     }
   known.set(geo.w, { x: best.x, y: best.y });
   return known.get(geo.w);
+}
+// The part of the logical harbour a scene frames: everything it can draw, with a margin of
+// water. Logical coordinates stay as they are (input, layouts and names use them); a sparse
+// harbour just frames less empty water, so it is drawn larger. The frame is fixed per level
+// and layout, so it never shifts as the walk, blueprint, language or counts change.
+const frames = new WeakMap();
+export const FRAME_PAD = 24;
+export function sceneView(level, geo) {
+  const known = frames.get(level) ?? new Map();
+  frames.set(level, known);
+  if (known.has(geo.w)) return known.get(geo.w);
+  const boxes = [harbourBounds(level, geo)];
+  if (!level.fixedStart) {
+    const b = ferryBerth(level, geo);
+    boxes.push({
+      x0: b.x - FERRY_WAKE,
+      x1: b.x + FERRY_WAKE,
+      y0: b.y + FERRY_BOX.y0,
+      y1: b.y + FERRY_BOX.y1,
+    });
+  }
+  const all = union(boxes),
+    view = { x: Math.round(all.x0 - FRAME_PAD), y: Math.round(all.y0 - FRAME_PAD) };
+  view.w = Math.round(all.x1 + FRAME_PAD) - view.x;
+  view.h = Math.round(all.y1 + FRAME_PAD) - view.y;
+  known.set(geo.w, view);
+  return view;
 }
 const FERRY = `<path class="ferry-wake" d="M-58 30q10 -5 20 0M42 31q9 -4 18 0"/><path class="ferry-hull" d="M-36 14H36L27 28Q0 33 -27 28Z"/><path class="ferry-rim" d="M-36 14H36"/>`;
 const segmentCross = (p, q, r, s) => {
@@ -295,13 +395,17 @@ export function citySVG(
     const { x, y } = geo.nodes[node.id];
     const selected = run.discoveryNodes?.includes(node.id),
       current = node.id === run.currentNode,
-      houses = scenery(level, geo, node.id, () => islandProps(node.id, i, geo, palette));
+      landmark = scenery(level, geo, node.id, () => islandProps(node.id, i, geo, palette));
     if (run.phase === 'complete')
-      reflections += `<g transform="translate(${x},${y + 68}) scale(1,-.3)">${houses}</g>`;
+      reflections += `<g transform="translate(${x},${y + 68}) scale(1,-.3)">${landmark}</g>`;
     const seed = islandSeed(node.id),
-      top = shorePath(x, y, 72, 47, seed);
-    terrain += `<g class="land"><path class="wake" d="M${x - 82} ${y + 22}q82 52 164 0"/><path d="${shorePath(x + 5, y + 14, 77, 51, seed)}" fill="#223f51" opacity=".19"/><path d="${shorePath(x, y + 8, 72, 47, seed)}" fill="${palette[1]}"/><path class="land-top" d="${top}" fill="${palette[0]}" stroke="#f1eed4" stroke-width="3"/><circle class="plaza-glow" cx="${x}" cy="${y}" r="58" fill="url(#lamplight-${uid})"/></g>`;
-    props += `<g class="props" transform="translate(${x},${y})">${houses}</g>`;
+      top = shorePath(x, y, 72, 47, seed),
+      shadow = (dx, dy, rx, ry, k) =>
+        `<path d="${shorePath(x + dx, y + dy, rx, ry, k)}" fill="#223f51" opacity=".1"/>`;
+    // Cut paper: a soft two-step shadow on the water, the sheet's edge, the island sheet with
+    // a light cut line, and a smaller, paler terrace laid on its north side with its own shadow.
+    terrain += `<g class="land"><path class="wake" d="M${x - 82} ${y + 22}q82 52 164 0"/>${shadow(7, 17, 77, 51, seed)}${shadow(3, 12, 74, 49, seed)}<path d="${shorePath(x, y + 9, 72, 47, seed)}" fill="${palette[1]}"/><path class="land-top" d="${top}" fill="${palette[0]}" stroke="#f6f2df" stroke-width="2"/>${shadow(1, -5, 52, 30, seed + 11)}<path class="land-sheet" d="${shorePath(x - 2, y - 9, 52, 30, seed + 11)}" fill="${tint(palette[0], 0.22)}"/><circle class="plaza-glow" cx="${x}" cy="${y}" r="58" fill="url(#lamplight-${uid})"/></g>`;
+    props += `<g class="props" transform="translate(${x},${y})">${landmark}</g>`;
     quays += `<ellipse cx="${x}" cy="${y}" rx="${SHORE.rx}" ry="${SHORE.ry}" fill="#000"/>`;
     land += `<path d="${top}"/>`;
     const action = interactive ? nodeAction(level, run, node.id) : null,
@@ -312,7 +416,7 @@ export function citySVG(
         : action
           ? ` role="button" tabindex="0"${action === 'toggle' ? ` aria-pressed="${Boolean(selected)}"` : ''} aria-label="${esc(label)}"`
           : ` role="img" aria-label="${esc(label)}"`;
-    labels += `<g class="node ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${action ? 'actionable' : ''} ${action === 'start' && !run.currentNode ? 'startable' : ''}"${interactive ? ` data-node="${node.id}"` : ''}${a11y}><circle class="node-dot" cx="${x}" cy="${y}" r="22"/><circle class="node-hit" cx="${x}" cy="${y}" r="43" fill="transparent"/><text x="${x}" y="${y + (portrait ? 7 : 6)}" text-anchor="middle" class="node-letter">${node.id}</text><text x="${name.x}" y="${name.y}" text-anchor="${name.anchor}" class="land-name">${name.lines.map((line, k) => (k ? `<tspan x="${name.x}" dy="${name.lead}">${esc(line)}</tspan>` : esc(line))).join('')}</text>${counts ? `<g class="degree"><rect x="${x - 28}" y="${y - 80}" width="56" height="29" rx="14"/><text x="${x}" y="${y - 60}" text-anchor="middle">${'Ⅱ'.repeat(Math.floor(d[node.id] / 2))}${d[node.id] % 2 ? ' •' : ''} ${d[node.id]}</text></g>` : ''}</g>`;
+    labels += `<g class="node ${current ? 'current' : ''} ${selected ? 'selected' : ''} ${action ? 'actionable' : ''} ${action === 'start' && !run.currentNode ? 'startable' : ''}"${interactive ? ` data-node="${node.id}"` : ''}${a11y}><circle class="node-dot" cx="${x}" cy="${y}" r="22"/><circle class="node-hit" cx="${x}" cy="${y}" r="43" fill="transparent"/><text x="${x}" y="${y + (portrait ? 7 : 6)}" text-anchor="middle" class="node-letter">${node.id}</text><text x="${name.x}" y="${name.y}" text-anchor="${name.anchor}" class="land-name"${name.size === nameSize(geo) ? '' : ` style="font-size:${name.size.toFixed(1)}px"`}>${name.lines.map((line, k) => (k ? `<tspan x="${name.x}" dy="${name.lead}">${esc(line)}</tspan>` : esc(line))).join('')}</text>${counts ? `<g class="degree"><rect x="${x - 28}" y="${y - 80}" width="56" height="29" rx="14"/><text x="${x}" y="${y - 60}" text-anchor="middle">${'Ⅱ'.repeat(Math.floor(d[node.id] / 2))}${d[node.id] % 2 ? ' •' : ''} ${d[node.id]}</text></g>` : ''}</g>`;
   }
   const shadows = crossingShadows(level, visible, geo, (edge) => {
     const edit = planning && candidateFor(level, edge.id);
@@ -361,6 +465,7 @@ export function citySVG(
         ? `<g transform="translate(${berth.x},${berth.y})" aria-hidden="true"><g class="ferry-leaving">${FERRY}</g></g>`
         : '',
     { w, h } = geo,
+    frame = sceneView(level, geo),
     bleed = `x="${-w}" y="${-h}" width="${3 * w}" height="${3 * h}"`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" class="city-scene atmosphere-${level.chapter} ${portrait ? 'portrait' : ''} ${view === 'graph' ? 'graph-view' : ''} ${planning ? 'blueprint' : ''} ${run.phase === 'complete' ? 'journey-complete' : ''}" aria-label="${interactive ? (lang === 'zh' ? '河港地图，点击相邻桥行走' : 'Harbour map. Click adjacent bridges to walk.') : lang === 'zh' ? '河港路线示意图' : 'Harbour route illustration.'}" role="${interactive ? 'group' : 'img'}"><defs><linearGradient id="water-${uid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w * 0.6}" y2="${h}"><stop class="water-a" stop-color="${water[0]}"/><stop class="water-b" offset="1" stop-color="${water[1]}"/></linearGradient><radialGradient id="sky-${uid}" gradientUnits="userSpaceOnUse" cx="${w * 0.15}" cy="${-h * 0.1}" r="${w * 0.9}"><stop stop-color="${sky[0]}" stop-opacity="${sky[1]}"/><stop offset="1" stop-color="${sky[0]}" stop-opacity="0"/></radialGradient><radialGradient id="lamplight-${uid}"><stop stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient><pattern id="ripples-${uid}" width="100" height="66" patternUnits="userSpaceOnUse"><path d="M10 22q16 -5 32 0M62 51q10 -4 20 0" stroke="#fff" opacity=".22" fill="none"/></pattern><pattern id="swell-${uid}" width="164" height="106" patternUnits="userSpaceOnUse" patternTransform="translate(37,19)"><path d="M20 30q22 -7 44 0M104 78q14 -5 28 0M66 96q9 -3 18 0" stroke="#fff" stroke-width="1.3" opacity=".14" fill="none"/></pattern><mask id="quay-${uid}" maskUnits="userSpaceOnUse" ${bleed}><rect ${bleed} fill="#fff"/>${quays}</mask><clipPath id="land-${uid}">${land}</clipPath></defs><rect class="water" ${bleed} fill="url(#water-${uid})"/><rect class="water-texture" ${bleed} fill="url(#ripples-${uid})"/><rect class="water-texture" ${bleed} fill="url(#swell-${uid})"/><rect class="sky" ${bleed} fill="url(#sky-${uid})"/><g class="city-world"><g class="reflections" aria-hidden="true">${reflections}</g><g class="terrain">${terrain}</g><g class="streets" clip-path="url(#land-${uid})">${streets}</g><g class="terrain-props">${props}</g><g class="bridges">${bridges}</g><g class="nodes">${labels}</g>${ferry}<g class="traveler${waiting ? ' waiting' : ''}" transform="translate(${pos.x},${pos.y})" aria-hidden="true"><g class="traveler-step${hop}"><ellipse class="traveler-ring" cy="14" rx="27" ry="12"/><g class="traveler-bob"><g transform="translate(0,-5) scale(1.45)"><ellipse cy="17" rx="14" ry="5" fill="#213b49" opacity=".2"/><path d="M-9 12l3 -23h12l5 23Z" fill="#d38a45" stroke="#7a4a22" stroke-width=".8"/><circle cy="-18" r="8" fill="#f2dbb7" stroke="#8a6a4a" stroke-width=".6"/><path d="M-10 -20l4 -8h12l5 8Z" fill="#394e58"/><path d="M9 -4l8 4 -3 12 -8 -3Z" fill="#f7ecd2" stroke="#9b8a6a" stroke-width=".6"/><path d="M-3 12v6M6 12v6" stroke="#435661" stroke-width="4"/></g>${waiting ? FERRY : ''}</g></g></g></g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${frame.x} ${frame.y} ${frame.w} ${frame.h}" style="--view-w:${frame.w};--view-h:${frame.h}" class="city-scene atmosphere-${level.chapter} ${portrait ? 'portrait' : ''} ${view === 'graph' ? 'graph-view' : ''} ${planning ? 'blueprint' : ''} ${run.phase === 'complete' ? 'journey-complete' : ''}" aria-label="${interactive ? (lang === 'zh' ? '河港地图，点击相邻桥行走' : 'Harbour map. Click adjacent bridges to walk.') : lang === 'zh' ? '河港路线示意图' : 'Harbour route illustration.'}" role="${interactive ? 'group' : 'img'}"><defs><linearGradient id="water-${uid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w * 0.6}" y2="${h}"><stop class="water-a" stop-color="${water[0]}"/><stop class="water-b" offset="1" stop-color="${water[1]}"/></linearGradient><radialGradient id="sky-${uid}" gradientUnits="userSpaceOnUse" cx="${w * 0.15}" cy="${-h * 0.1}" r="${w * 0.9}"><stop stop-color="${sky[0]}" stop-opacity="${sky[1]}"/><stop offset="1" stop-color="${sky[0]}" stop-opacity="0"/></radialGradient><radialGradient id="lamplight-${uid}"><stop stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient><pattern id="ripples-${uid}" width="100" height="66" patternUnits="userSpaceOnUse"><path d="M10 22q16 -5 32 0M62 51q10 -4 20 0" stroke="#fff" opacity=".22" fill="none"/></pattern><pattern id="swell-${uid}" width="164" height="106" patternUnits="userSpaceOnUse" patternTransform="translate(37,19)"><path d="M20 30q22 -7 44 0M104 78q14 -5 28 0M66 96q9 -3 18 0" stroke="#fff" stroke-width="1.3" opacity=".14" fill="none"/></pattern><mask id="quay-${uid}" maskUnits="userSpaceOnUse" ${bleed}><rect ${bleed} fill="#fff"/>${quays}</mask><clipPath id="land-${uid}">${land}</clipPath></defs><rect class="water" ${bleed} fill="url(#water-${uid})"/><rect class="water-texture" ${bleed} fill="url(#ripples-${uid})"/><rect class="water-texture" ${bleed} fill="url(#swell-${uid})"/><rect class="sky" ${bleed} fill="url(#sky-${uid})"/><g class="city-world"><g class="reflections" aria-hidden="true">${reflections}</g><g class="terrain">${terrain}</g><g class="streets" clip-path="url(#land-${uid})">${streets}</g><g class="terrain-props">${props}</g><g class="bridges">${bridges}</g><g class="nodes">${labels}</g>${ferry}<g class="traveler${waiting ? ' waiting' : ''}" transform="translate(${pos.x},${pos.y})" aria-hidden="true"><g class="traveler-step${hop}"><ellipse class="traveler-ring" cy="14" rx="27" ry="12"/><g class="traveler-bob"><g transform="translate(0,-5) scale(1.45)"><ellipse cy="17" rx="14" ry="5" fill="#213b49" opacity=".2"/><path d="M-9 12l3 -23h12l5 23Z" fill="#d38a45" stroke="#7a4a22" stroke-width=".8"/><circle cy="-18" r="8" fill="#f2dbb7" stroke="#8a6a4a" stroke-width=".6"/><path d="M-10 -20l4 -8h12l5 8Z" fill="#394e58"/><path d="M9 -4l8 4 -3 12 -8 -3Z" fill="#f7ecd2" stroke="#9b8a6a" stroke-width=".6"/><path d="M-3 12v6M6 12v6" stroke="#435661" stroke-width="4"/></g>${waiting ? FERRY : ''}</g></g></g></g></svg>`;
 }
