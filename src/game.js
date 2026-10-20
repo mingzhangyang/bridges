@@ -468,7 +468,13 @@ export function startGame() {
       const proof = repairSolution(level);
       optimal = proof && proof.cost === applyEdits(level, run.finalEditSet).cost;
     }
-    banner.innerHTML = `${commissionStamp(level.id)}<div class="completion-copy"><strong>${escape(stamp)}</strong><small>${optimal ? tr('optimal') : nm(level.title)}</small></div><button class="primary" id="next-level">${tr('next')} →</button>`;
+    // The headline says the level is done; the seal it earned and the level follow beneath.
+    const headline = level.kind === 'discovery' ? stamp : tr('cleared'),
+      caption = [
+        ...(level.kind === 'discovery' ? [] : [stamp]),
+        optimal ? tr('optimal') : nm(level.title),
+      ].join(' · ');
+    banner.innerHTML = `${commissionStamp(level.id)}<div class="completion-copy"><strong>${escape(headline)}</strong><small>${escape(caption)}</small></div><button class="primary" id="next-level">${tr('next')} →</button>`;
     $('next-level').onclick = () => {
       if (dailyMode()) {
         openAtlas();
